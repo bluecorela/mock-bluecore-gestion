@@ -1,4 +1,4 @@
-import {Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';
@@ -7,6 +7,7 @@ import { getFirestore, collection, getDocs, query, where } from 'firebase/firest
 export class FirebaseClient {
   private auth: any;
   private db: any;
+  private isLogged = false;
 
   constructor() {
     console.log('Inicializando Firebase Client...');
@@ -27,6 +28,16 @@ export class FirebaseClient {
   }
 
   async login() {
+
+    if (this.auth.currentUser) {
+    this.isLogged = true;
+    return;
+  }
+
+  if (this.isLogged) {
+    this.isLogged = false;
+  }
+
     console.log(`Intentando login con ${process.env.FIREBASE_EMAIL}`);
     try {
       const userCredential = await signInWithEmailAndPassword(
@@ -34,25 +45,28 @@ export class FirebaseClient {
         process.env.FIREBASE_EMAIL!,
         process.env.FIREBASE_PASSWORD!,
       );
+      this.isLogged = true;
+
       console.log('Login exitoso:', userCredential.user.email);
     } catch (error) {
+      this.isLogged = false;
       console.error('Error en login:', error);
       throw error;
     }
   }
 
   async getPersonalByEmail(email: string) {
-  await this.login();
+    await this.login();
 
-  const personalRef = collection(this.db, 'personal');
-  const q = query(personalRef, where('correo', '==', email));
-  const snap = await getDocs(q);
+    const personalRef = collection(this.db, 'personal');
+    const q = query(personalRef, where('correo', '==', email));
+    const snap = await getDocs(q);
 
-  if (snap.empty) return null;
+    if (snap.empty) return null;
 
-  const doc = snap.docs[0];
-  return { id: doc.id, ...doc.data() };
-}
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
+  }
 
   async getEquipos() {
     await this.login();
