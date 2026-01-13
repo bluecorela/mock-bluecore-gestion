@@ -68,6 +68,26 @@ export class FirebaseClient {
     return { id: doc.id, ...doc.data() };
   }
 
+
+async getPersonalByEquipo(equipoId: string) {
+  await this.login();
+
+  const pEquipoId = equipoId?.split('/').pop();
+  const personalRef = collection(this.db, `personal/${equipoId}`);
+
+  const q = query(
+    personalRef,
+    where('equipo', '==', pEquipoId)
+  );
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map(docu => ({
+    id: docu.id,
+    ...docu.data(),
+  }));
+}
+
   async getEquipos() {
     await this.login();
     const equiposRef = collection(this.db, 'equipos');
