@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, query, where } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore';
 
 @Injectable()
 export class FirebaseClient {
@@ -72,12 +72,12 @@ export class FirebaseClient {
 async getPersonalByEquipo(equipoId: string) {
   await this.login();
 
-  const pEquipoId = equipoId?.split('/').pop();
-  const personalRef = collection(this.db, `personal/${equipoId}`);
+  const equipoRef = doc(this.db, 'equipos', equipoId);
+  const personalRef = collection(this.db, 'personal');
 
   const q = query(
     personalRef,
-    where('equipo', '==', pEquipoId)
+    where('equipo', '==', equipoRef)
   );
 
   const snap = await getDocs(q);

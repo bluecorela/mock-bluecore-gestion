@@ -8,4 +8,8 @@ export class PersonalService {
   async findOne(correo: string) {
     return this.firebaseClient.getPersonalByEmail(decodeURIComponent(correo));
   }
+
+  async findEquipo(equipoId: string) {
+    return this.firebaseClient.getPersonalByEquipo(equipoId);
+  }
 }

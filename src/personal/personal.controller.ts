@@ -1,6 +1,7 @@
 import { Controller, Get, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
 import { PersonalService } from './personal.service';
 import { ApiParam, ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { get } from 'http';
 
 @ApiTags('Personal')
 @Controller('personal')
@@ -32,6 +33,30 @@ export class PersonalController {
       throw new NotFoundException('Usuario no encontrado');
     }
 
+    return personal;
+  }
+  @Get('equipo')
+  @ApiOperation({ summary: 'Obtener personal por equipo' })
+  @ApiQuery({
+    name: 'equipoId',
+    required: true,
+    type: String,
+    example: 'sgb-evolucion',
+    description: 'ID del equipo',
+  })
+  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado' })
+  @ApiResponse({ status: 400, description: 'El ID del equipo es obligatorio' })
+  @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
+
+  async findEquipo(@Query('equipoId') equipoId?: string) {
+    if (!equipoId) {
+      throw new BadRequestException('El parámetro "equipoId" es obligatorio');
+    }
+   const personal = await this.personalService.findEquipo(equipoId);
+
+    if (!personal || personal.length === 0) {
+      throw new NotFoundException('Equipo no encontrado');
+} 
     return personal;
   }
 }
