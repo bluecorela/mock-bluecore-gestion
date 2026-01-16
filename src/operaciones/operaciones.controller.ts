@@ -21,4 +21,21 @@ export class OperacionesController {
             ingenierosActuales
         );
     }
+
+    @Post('rendimiento/sprints')
+    calcularRendimientoSprints(
+        @Body() body: {
+            sprints: any[];
+            historialData: any[];
+            ingenierosActuales: any[];
+        }
+    ) {
+        const { sprints, historialData, ingenierosActuales } = body;
+
+        return this.operacionesService.calcularRendimientoSprints(
+            sprints,
+            historialData,
+            ingenierosActuales
+        );
+    }
 }

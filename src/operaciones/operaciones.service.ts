@@ -23,14 +23,14 @@ export class OperacionesService {
         if (!sprintCerrado.sprint_cerrado && total > 1) {
             sprintCerrado = ordenados[total - 2];
         }
-        
+
         const integrantes = sprintCerrado.integrantes ?? [];
 
         const evaluados = integrantes.filter((data: any) => {
             if (data.calificacion === 'Arquitecto') return false;
 
             const persona = ingenierosActuales.find(p => p.nombre === data.nombre);
-             console.log('persona encontrada:', persona);
+            console.log('persona encontrada:', persona);
             if (!persona) return false;
 
             if (persona.inicioReemplazoSprintId) {
@@ -83,4 +83,56 @@ export class OperacionesService {
         return '🔴 Bajo rendimiento';
     }
 
+    calcularRendimientoSprints(
+        sprints: any[],
+        historialData: any[],
+        ingenierosActuales: any[]
+    ) {
+        if (!sprints?.length) return null;
+
+        const ordenados = [...sprints].sort(
+            (a, b) =>
+                new Date(a.fechaInicio ?? 0).getTime() -
+                new Date(b.fechaInicio ?? 0).getTime()
+        );
+
+        const ultimos = ordenados.slice(-8).reverse();
+
+        const labels: string[] = [];
+        const valores: number[] = [];
+        for (const sprint of ultimos) {
+            const integrantes = sprint.integrantes ?? [];
+            const evaluados = integrantes.filter((data: any) => {
+                if (data.calificacion === 'Arquitecto') return false;
+
+                const persona = ingenierosActuales.find(p => p.nombre === data.nombre);
+                if (!persona) return false;
+
+                if (persona.inicioReemplazoSprintId) {
+                    const fechaIngreso = this.obtenerFechaIngresoDeHistorial(historialData, persona.id);
+                    if (fechaIngreso && sprint.sprint_cerrado && fechaIngreso > sprint.sprint_cerrado) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+
+            const promedio = evaluados.reduce(
+                (acc: number, i: any) => acc + (i.total_final || 0),
+                0
+            ) / (evaluados.length || 1);
+
+
+            labels.push(sprint.id);
+            valores.push(Math.round(promedio * 100) / 100);
+        }
+        return {
+            labels,
+            valores,
+        };
+
+    }
+
 }
+
