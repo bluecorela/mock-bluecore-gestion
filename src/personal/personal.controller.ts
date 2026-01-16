@@ -52,11 +52,28 @@ export class PersonalController {
     if (!equipoId) {
       throw new BadRequestException('El parámetro "equipoId" es obligatorio');
     }
-   const personal = await this.personalService.findEquipo(equipoId);
+    const personal = await this.personalService.findEquipo(equipoId);
 
     if (!personal || personal.length === 0) {
       throw new NotFoundException('Equipo no encontrado');
-} 
+    }
     return personal;
+  }
+
+  @Get('personal')
+  @ApiOperation({ summary: 'Obtener todo el personal' })
+  @ApiResponse({ status: 200, description: 'Lista de todo el personal' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiResponse({ status: 404, description: 'No se encontró personal' })
+  async findAll() {
+
+    const personal = await this.personalService.findAll();
+
+    if (!personal) {
+      throw new NotFoundException('No se encontró personal');
+    }
+
+    return personal;
+
   }
 }

@@ -6,6 +6,7 @@ import { PersonalModule } from './personal/personal.module';
 import { EquiposModule } from './equipos/equipos.module';
 import { HistorialRotacionesModule } from './historial-rotaciones/historial-rotaciones.module';
 import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
+import { OperacionesModule } from './operaciones/operaciones.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
     EquiposModule,
     HistorialRotacionesModule,
     ModulosSidebarModule,
+    OperacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

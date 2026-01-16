@@ -67,6 +67,19 @@ export class FirebaseClient {
     const doc = snap.docs[0];
     return { id: doc.id, ...doc.data() };
   }
+  
+  async getPersonal(){
+    await this.login();
+
+    const personalRef = collection(this.db, 'personal');
+    const snap = await getDocs(personalRef);
+
+    return snap.docs.map(docu => ({
+      id: docu.id,
+      ...docu.data(),
+    }));
+
+  }
 
 
 async getPersonalByEquipo(equipoId: string) {

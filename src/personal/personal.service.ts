@@ -12,4 +12,9 @@ export class PersonalService {
   async findEquipo(equipoId: string) {
     return this.firebaseClient.getPersonalByEquipo(equipoId);
   }
+
+  async findAll() {
+    return this.firebaseClient.getPersonal();
+  }
+
 }
