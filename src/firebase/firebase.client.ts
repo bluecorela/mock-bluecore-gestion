@@ -112,6 +112,16 @@ export class FirebaseClient {
 
     return equiposDisponibles;
   }
+  async getEquipo(equipoId: string) {
+    await this.login();
+    const equipoRef = doc(this.db, `equipos/${equipoId}`);
+    const equipoSnap = await getDoc(equipoRef);
+    if (!equipoSnap.exists()) {
+      return null;
+    }
+    return { id: equipoSnap.id, ...equipoSnap.data() };
+  }
+  
   async getSprintsByEquipo(equipoId: string) {
     await this.login();
     const sprintsRef = collection(this.db, `equipos/${equipoId}/sprints`);

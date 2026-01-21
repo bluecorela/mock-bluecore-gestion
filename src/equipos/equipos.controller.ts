@@ -118,4 +118,33 @@ export class EquiposController {
 
     return sprint;
   }
+
+  @Get(':equipoId')
+  @ApiOperation({ summary: 'Obtener un equipo por ID' })
+  @ApiParam({
+    name: 'equipoId',
+    type: String,
+    example: 'sgb-evolucion',
+    description: 'ID del equipo',
+  })
+
+  @ApiResponse({ status: 200, description: 'Datos del equipo', })
+  @ApiResponse({ status: 400, description: 'equipoId inválido', })
+  @ApiResponse({ status: 404, description: 'No existe el equipo', })
+
+  async getEquipo(@Param('equipoId') equipoId: string) {
+    if (!equipoId) {
+      throw new BadRequestException('equipoId es obligatorio');
+    }
+
+    const equipo = await this.equiposService.getEquipo(equipoId);
+
+    if (!equipo) {
+      throw new NotFoundException(
+        'No existe el equipo',
+      );
+    }
+
+    return equipo;
+  }
 }
