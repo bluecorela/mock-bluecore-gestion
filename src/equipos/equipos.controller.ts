@@ -84,4 +84,38 @@ export class EquiposController {
 
     return integrantes;
   }
+  @Get(':equipoId/sprints/:sprintId')
+  @ApiOperation({ summary: 'Obtener un sprint por equipo' })
+  @ApiParam({
+    name: 'equipoId',
+    type: String,
+    example: 'sgb-evolucion',
+    description: 'ID del equipo',
+  })
+  @ApiParam({
+    name: 'sprintId',
+    type: String,
+    example: 'sprint-1',
+    description: 'ID del sprint',
+  })
+
+  @ApiResponse({ status: 200, description: 'Datos del sprint', })
+  @ApiResponse({ status: 400, description: 'equipoId o sprintId inválido', })
+  @ApiResponse({ status: 404, description: 'No existe el sprint para este equipo', })
+
+  async getSprint(@Param('equipoId') equipoId: string, @Param('sprintId') sprintId: string) {
+    if (!equipoId || !sprintId) {
+      throw new BadRequestException('equipoId y sprintId son obligatorios');
+    }
+
+    const sprint = await this.equiposService.getSprint( equipoId, sprintId,);
+
+    if (!sprint) {
+      throw new NotFoundException(
+        'No existe el sprint para este equipo',
+      );
+    }
+
+    return sprint;
+  }
 }

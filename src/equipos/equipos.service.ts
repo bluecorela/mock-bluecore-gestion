@@ -21,5 +21,8 @@ export class EquiposService {
   async getIntegrantesBySprint(equipoId: string, sprintId: string) {
     return this.firebaseClient.getIntegrantesBySprint(equipoId, sprintId);
   }
+  async getSprint(equipoId: string, sprintId: string) {
+    return this.firebaseClient.getSprint(equipoId, sprintId);
+  }
   
 }

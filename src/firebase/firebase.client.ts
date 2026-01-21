@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 
 @Injectable()
 export class FirebaseClient {
@@ -30,13 +30,13 @@ export class FirebaseClient {
   async login() {
 
     if (this.auth.currentUser) {
-    this.isLogged = true;
-    return;
-  }
+      this.isLogged = true;
+      return;
+    }
 
-  if (this.isLogged) {
-    this.isLogged = false;
-  }
+    if (this.isLogged) {
+      this.isLogged = false;
+    }
 
     console.log(`Intentando login con ${process.env.FIREBASE_EMAIL}`);
     try {
@@ -67,8 +67,8 @@ export class FirebaseClient {
     const doc = snap.docs[0];
     return { id: doc.id, ...doc.data() };
   }
-  
-  async getPersonal(){
+
+  async getPersonal() {
     await this.login();
 
     const personalRef = collection(this.db, 'personal');
@@ -82,24 +82,24 @@ export class FirebaseClient {
   }
 
 
-async getPersonalByEquipo(equipoId: string) {
-  await this.login();
+  async getPersonalByEquipo(equipoId: string) {
+    await this.login();
 
-  const equipoRef = doc(this.db, 'equipos', equipoId);
-  const personalRef = collection(this.db, 'personal');
+    const equipoRef = doc(this.db, 'equipos', equipoId);
+    const personalRef = collection(this.db, 'personal');
 
-  const q = query(
-    personalRef,
-    where('equipo', '==', equipoRef)
-  );
+    const q = query(
+      personalRef,
+      where('equipo', '==', equipoRef)
+    );
 
-  const snap = await getDocs(q);
+    const snap = await getDocs(q);
 
-  return snap.docs.map(docu => ({
-    id: docu.id,
-    ...docu.data(),
-  }));
-}
+    return snap.docs.map(docu => ({
+      id: docu.id,
+      ...docu.data(),
+    }));
+  }
 
   async getEquipos() {
     await this.login();
@@ -131,10 +131,21 @@ async getPersonalByEquipo(equipoId: string) {
     return integrantesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   }
 
+  async getSprint(equipoId: string, sprintId: string) {
+    await this.login();
+    const sprintRef = doc(this.db, `equipos/${equipoId}/sprints/${sprintId}`);
+    const sprintSnap = await getDoc(sprintRef);
+    if (!sprintSnap.exists()) {
+      return null;
+    }
+    return { id: sprintSnap.id, ...sprintSnap.data() };
+  }
+
   async getHistorialRotaciones() {
     await this.login();
     const historialRef = collection(this.db, 'historialRotaciones');
     const historialSnap = await getDocs(historialRef);
+
     const historialData = historialSnap.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
