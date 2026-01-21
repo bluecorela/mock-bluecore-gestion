@@ -138,7 +138,16 @@ export class FirebaseClient {
     if (!sprintSnap.exists()) {
       return null;
     }
-    return { id: sprintSnap.id, ...sprintSnap.data() };
+    //return { id: sprintSnap.id, ...sprintSnap.data() };
+    return {
+      id: sprintSnap.id,
+      fecha_inicio: sprintSnap.data().fecha_inicio
+        ? sprintSnap.data().fecha_inicio.toDate().toISOString()
+        : null,
+      fecha_fin: sprintSnap.data().fecha_fin
+        ? sprintSnap.data().fecha_fin.toDate().toISOString()
+        : null,
+    };
   }
 
   async getHistorialRotaciones() {
