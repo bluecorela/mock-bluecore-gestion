@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { initializeApp, getApps } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -11,20 +11,21 @@ export class FirebaseClient {
 
   constructor() {
     console.log('Inicializando Firebase Client...');
-    if (!getApps().length) {
-      const app = initializeApp({
+    const app = getApps().length
+      ? getApp()
+      : initializeApp({
         apiKey: process.env.FIREBASE_API_KEY,
         authDomain: process.env.FIREBASE_AUTH_DOMAIN,
         projectId: process.env.FIREBASE_PROJECT_ID,
         storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
         appId: process.env.FIREBASE_APP_ID,
       });
-      console.log('Firebase App inicializado');
+    console.log('Firebase App inicializado');
 
-      this.auth = getAuth(app);
-      this.db = getFirestore(app);
-      console.log('Auth y Firestore listos');
-    }
+    this.auth = getAuth(app);
+    this.db = getFirestore(app);
+
+    console.log('Auth y Firestore listos');
   }
 
   async login() {
@@ -203,7 +204,6 @@ export class FirebaseClient {
     const integranteId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
 
     const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
-
     const sprintSnap = await getDoc(sprintRef);
 
     if (!sprintSnap.exists()) {
