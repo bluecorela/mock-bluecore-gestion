@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
 
 @Injectable()
 export class FirebaseClient {
@@ -121,7 +121,7 @@ export class FirebaseClient {
     }
     return { id: equipoSnap.id, ...equipoSnap.data() };
   }
-  
+
   async getSprintsByEquipo(equipoId: string) {
     await this.login();
     const sprintsRef = collection(this.db, `equipos/${equipoId}/sprints`);
@@ -182,4 +182,54 @@ export class FirebaseClient {
         modulo.rolesPermitidos.includes(rol));
     return modulosData;
   }
+
+  async guardarEvaluacion(data: any) {
+    await this.login();
+
+    const {
+      equipoId,
+      sprintId,
+      fechaInicio,
+      fechaFin,
+      ingeniero,
+      metricas,
+      puntuacionFinal,
+      calificacionTexto,
+      comentarios,
+      evaluadorCorreo,
+    } = data;
+
+    const nombreIngeniero = ingeniero.split(' – ')[0];
+    const integranteId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+
+    const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
+
+    const sprintSnap = await getDoc(sprintRef);
+
+    if (!sprintSnap.exists()) {
+      await setDoc(sprintRef, {
+        fecha_inicio: new Date(fechaInicio),
+        fecha_fin: new Date(fechaFin),
+      });
+    }
+
+    const integranteRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId, 'Integrantes', integranteId);
+
+    await setDoc(
+      integranteRef,
+      {
+        nombre: nombreIngeniero,
+        ...metricas,
+        total_final: puntuacionFinal,
+        calificacion: calificacionTexto,
+        comentarios,
+        evaluado_por: evaluadorCorreo,
+        fecha_evaluacion: new Date(),
+      },
+      { merge: true }
+    );
+
+    return { ok: true };
+  }
+
 }

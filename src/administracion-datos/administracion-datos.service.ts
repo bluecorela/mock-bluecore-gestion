@@ -6,6 +6,8 @@ export class AdministracionDatosService {
     constructor(private readonly firebaseClient: FirebaseClient) { }
 
     async guardarEvaluacion(data: any) {
+        console.log('Payload recibido:', data);
+
         try {
             const {
                 equipoId,
