@@ -184,7 +184,7 @@ export class FirebaseClient {
     return modulosData;
   }
 
-  async guardarEvaluacion(data: any) {
+async guardarEvaluacion(data: any) {
     await this.login();
 
     const {
