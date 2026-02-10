@@ -1,6 +1,7 @@
 import { Controller, Get, Param, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EquiposService } from './equipos.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FirebaseClient } from '../firebase/firebase.client';
 
 @ApiTags('Equipos')
 @Controller('equipos')
@@ -51,39 +52,13 @@ export class EquiposController {
   }
 
   @Get(':equipoId/sprints/:sprintId/integrantes')
-  @ApiOperation({ summary: 'Obtener integrantes de un equipo por sprint' })
-  @ApiParam({
-    name: 'equipoId',
-    type: String,
-    example: 'sgb-evolucion',
-    description: 'ID del equipo',
-  })
-  @ApiParam({
-    name: 'sprintId',
-    type: String,
-    example: 'sprint-1',
-    description: 'ID del sprint',
-  })
-
-  @ApiResponse({ status: 200, description: 'Listado de integrantes del equipo en el sprint', })
-  @ApiResponse({ status: 400, description: 'equipoId o sprintId inválido', })
-  @ApiResponse({ status: 404, description: 'No existen integrantes para este equipo en el sprint', })
-
-  async getIntegrantes(@Param('equipoId') equipoId: string, @Param('sprintId') sprintId: string) {
-    if (!equipoId || !sprintId) {
-      throw new BadRequestException('equipoId y sprintId son obligatorios');
-    }
-
-    const integrantes = await this.equiposService.getIntegrantesBySprint( equipoId, sprintId,);
-
-    if (!integrantes || integrantes.length === 0) {
-      throw new NotFoundException(
-        'No existen integrantes para este equipo en el sprint',
-      );
-    }
-
-    return integrantes;
+  @ApiOperation({ summary: 'Obtener integrantes del equipo por sprint' })
+  async getIntegrantes( @Param('equipoId') equipoId: string,
+    @Param('sprintId') sprintId: string,) {
+    return this.equiposService.getIntegrantesBySprint(equipoId, sprintId);
   }
+
+
   @Get(':equipoId/sprints/:sprintId')
   @ApiOperation({ summary: 'Obtener un sprint por equipo' })
   @ApiParam({
@@ -147,4 +122,29 @@ export class EquiposController {
 
     return equipo;
   }
+  
+  @Get(':equipoId/sprints/:sprintId/metricas')
+  @ApiOperation({ summary: 'Obtener métricas del equipo por sprint' })
+  @ApiParam({ name: 'equipoId', type: String })
+  @ApiParam({ name: 'sprintId', type: String })
+  @ApiResponse({ status: 200 })
+  async getMetricas(
+    @Param('equipoId') equipoId: string,
+    @Param('sprintId') sprintId: string,
+  ) {
+    if (!equipoId || !sprintId) {
+      throw new BadRequestException('equipoId y sprintId son obligatorios');
+    }
+
+    const metricas = await this.equiposService.getMetricas(equipoId, sprintId);
+
+    if (!metricas || metricas.resumen.length === 0) {
+      throw new NotFoundException('No existen métricas para este sprint');
+    }
+
+    return metricas;
+  }
+
+
+
 }

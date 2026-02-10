@@ -3,6 +3,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
 
+export interface ResumenIntegrante {
+  nombre: string;
+  total1: number;
+  total2: number;
+  total3: number;
+  total_final: number;
+  calificacion: string;
+  comentarios?: string;
+}
 @Injectable()
 export class FirebaseClient {
   private auth: any;
@@ -134,13 +143,24 @@ export class FirebaseClient {
     return sprintsData;
   }
 
-  async getIntegrantesBySprint(equipoId: string, sprintId: string) {
+    async getIntegrantesBySprint(
+    equipoId: string,
+    sprintId: string
+  ): Promise<(ResumenIntegrante & { id: string })[]> {
     await this.login();
-    const integrantesRef = collection(this.db, `equipos/${equipoId}/sprints/${sprintId}/Integrantes`);
+
+    const integrantesRef = collection(
+      this.db,
+      `equipos/${equipoId}/sprints/${sprintId}/Integrantes`
+    );
+
     const integrantesSnap = await getDocs(integrantesRef);
 
-    return integrantesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-  }
+    return integrantesSnap.docs.map(doc => ({
+      id: doc.id,
+      ...(doc.data() as ResumenIntegrante),
+    }));
+    }
 
   async getSprint(equipoId: string, sprintId: string) {
     await this.login();
@@ -231,5 +251,50 @@ async guardarEvaluacion(data: any) {
 
     return { ok: true };
   }
+
+  //Metodo para mostrar fechas en el formato correcto
+  private formatDate(dateValue: any): string {
+    if (!dateValue) return '';
+
+    const date =
+      typeof dateValue.toDate === 'function'
+        ? dateValue.toDate()
+        : new Date(dateValue);
+
+    return date.toLocaleDateString('es-ES', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  }
+
+  async obtenerMetricas(equipoId: string, sprintId: string) {
+  await this.login();
+
+  const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
+
+  const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
+  const sprintSnap = await getDoc(sprintRef);
+  const sprintData = sprintSnap.data();
+
+  const resumen = integrantes
+    .filter(i => i.calificacion !== 'Arquitecto')
+    .map(i => ({
+      nombre: i.nombre,
+      total1: i.total1,
+      total2: i.total2,
+      total3: i.total3,
+      totalFinal: `${i.total_final}% (${i.calificacion})`,
+      comentarios: i.comentarios ?? '—',
+    }));
+
+  return {
+    fechaInicio: this.formatDate(sprintData?.fecha_inicio),
+    fechaFin: this.formatDate(sprintData?.fecha_fin),
+    resumen,
+  };
+}
+
+
 
 }

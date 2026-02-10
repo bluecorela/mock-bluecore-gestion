@@ -28,5 +28,9 @@ export class EquiposService {
   async getEquipo(equipoId: string) {
     return this.firebaseClient.getEquipo(equipoId);
   }
+
+  async getMetricas(equipoId: string, sprintId: string){
+    return this.firebaseClient.obtenerMetricas(equipoId, sprintId);
+  }
   
 }
