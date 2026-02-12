@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseClient } from '../firebase/firebase.client';
+import { CreateEquipoDto } from './dto/create-equipo.dto';
 
 @Injectable()
 export class EquiposService {
@@ -15,7 +16,7 @@ export class EquiposService {
       nombre: s.id,
       fechaInicio: s.fecha_inicio?.toDate?.() ?? null,
       fechaFin: s.fecha_fin?.toDate?.() ?? null,
-      sprintsCerrado:s.sprint_cerrado?.toDate?.() ?? null,
+      sprintsCerrado: s.sprint_cerrado?.toDate?.() ?? null,
     }));
   }
   async getIntegrantesBySprint(equipoId: string, sprintId: string) {
@@ -29,8 +30,12 @@ export class EquiposService {
     return this.firebaseClient.getEquipo(equipoId);
   }
 
-  async getMetricas(equipoId: string, sprintId: string){
+  async getMetricas(equipoId: string, sprintId: string) {
     return this.firebaseClient.obtenerMetricas(equipoId, sprintId);
   }
-  
+
+  async create(createEquipoDto: CreateEquipoDto) {
+    return this.firebaseClient.createEquipo(createEquipoDto.nombre);
+  }
+
 }

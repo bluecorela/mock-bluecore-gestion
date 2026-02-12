@@ -1,12 +1,21 @@
-import { Controller, Get, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
 import { PersonalService } from './personal.service';
 import { ApiParam, ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { get } from 'http';
+import { CreatePersonalDto } from './dto/create-personal.dto';
 
 @ApiTags('Personal')
 @Controller('personal')
 export class PersonalController {
   constructor(private readonly personalService: PersonalService) { }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo miembro del personal' })
+  @ApiResponse({ status: 201, description: 'Miembro creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o validación de negocio fallida' })
+  async create(@Body() createPersonalDto: CreatePersonalDto) {
+    return await this.personalService.create(createPersonalDto);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Obtener información del usuario' })
@@ -44,9 +53,8 @@ export class PersonalController {
     example: 'sgb-evolucion',
     description: 'ID del equipo',
   })
-  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado' })
+  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado (puede ser un array vacío)' })
   @ApiResponse({ status: 400, description: 'El ID del equipo es obligatorio' })
-  @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
 
   async findEquipo(@Query('equipoId') equipoId?: string) {
     if (!equipoId) {
@@ -54,10 +62,8 @@ export class PersonalController {
     }
     const personal = await this.personalService.findEquipo(equipoId);
 
-    if (!personal || personal.length === 0) {
-      throw new NotFoundException('Equipo no encontrado');
-    }
-    return personal;
+    // Retornar array vacío si no hay personal, en lugar de 404
+    return personal || [];
   }
 
   @Get('personal')

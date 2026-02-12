@@ -1,12 +1,28 @@
-import { Controller, Get, Param, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { EquiposService } from './equipos.service';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { FirebaseClient } from '../firebase/firebase.client';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'; import { FirebaseClient } from '../firebase/firebase.client';
+import { CreateEquipoDto } from './dto/create-equipo.dto';
 
 @ApiTags('Equipos')
 @Controller('equipos')
 export class EquiposController {
   constructor(private readonly equiposService: EquiposService) { }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo equipo' })
+  @ApiResponse({ status: 201, description: 'Equipo creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos' })
+  @ApiResponse({ status: 409, description: 'Ya existe un equipo con ese nombre' })
+  async create(@Body() createEquipoDto: CreateEquipoDto) {
+    try {
+      return await this.equiposService.create(createEquipoDto);
+    } catch (error) {
+      if (error.message === 'Ya existe un equipo con ese nombre') {
+        throw new ConflictException(error.message);
+      }
+      throw error;
+    }
+  }
 
   @Get()
   @ApiOperation({ summary: 'Obtener todos los equipos' })
@@ -53,7 +69,7 @@ export class EquiposController {
 
   @Get(':equipoId/sprints/:sprintId/integrantes')
   @ApiOperation({ summary: 'Obtener integrantes del equipo por sprint' })
-  async getIntegrantes( @Param('equipoId') equipoId: string,
+  async getIntegrantes(@Param('equipoId') equipoId: string,
     @Param('sprintId') sprintId: string,) {
     return this.equiposService.getIntegrantesBySprint(equipoId, sprintId);
   }
@@ -83,7 +99,7 @@ export class EquiposController {
       throw new BadRequestException('equipoId y sprintId son obligatorios');
     }
 
-    const sprint = await this.equiposService.getSprint( equipoId, sprintId,);
+    const sprint = await this.equiposService.getSprint(equipoId, sprintId,);
 
     if (!sprint) {
       throw new NotFoundException(
@@ -122,7 +138,8 @@ export class EquiposController {
 
     return equipo;
   }
-  
+
+  //Obtener metricas del equipo por sprint --> Buscador Métricas
   @Get(':equipoId/sprints/:sprintId/metricas')
   @ApiOperation({ summary: 'Obtener métricas del equipo por sprint' })
   @ApiParam({ name: 'equipoId', type: String })

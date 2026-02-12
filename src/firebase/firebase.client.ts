@@ -143,7 +143,7 @@ export class FirebaseClient {
     return sprintsData;
   }
 
-    async getIntegrantesBySprint(
+  async getIntegrantesBySprint(
     equipoId: string,
     sprintId: string
   ): Promise<(ResumenIntegrante & { id: string })[]> {
@@ -160,7 +160,7 @@ export class FirebaseClient {
       id: doc.id,
       ...(doc.data() as ResumenIntegrante),
     }));
-    }
+  }
 
   async getSprint(equipoId: string, sprintId: string) {
     await this.login();
@@ -204,7 +204,7 @@ export class FirebaseClient {
     return modulosData;
   }
 
-async guardarEvaluacion(data: any) {
+  async guardarEvaluacion(data: any) {
     await this.login();
 
     const {
@@ -269,32 +269,87 @@ async guardarEvaluacion(data: any) {
   }
 
   async obtenerMetricas(equipoId: string, sprintId: string) {
-  await this.login();
+    await this.login();
 
-  const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
+    const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
 
-  const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
-  const sprintSnap = await getDoc(sprintRef);
-  const sprintData = sprintSnap.data();
+    const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
+    const sprintSnap = await getDoc(sprintRef);
+    const sprintData = sprintSnap.data();
 
-  const resumen = integrantes
-    .filter(i => i.calificacion !== 'Arquitecto')
-    .map(i => ({
-      nombre: i.nombre,
-      total1: i.total1,
-      total2: i.total2,
-      total3: i.total3,
-      totalFinal: `${i.total_final}% (${i.calificacion})`,
-      comentarios: i.comentarios ?? '—',
-    }));
+    const resumen = integrantes
+      .filter(i => i.calificacion !== 'Arquitecto')
+      .map(i => ({
+        nombre: i.nombre,
+        total1: i.total1,
+        total2: i.total2,
+        total3: i.total3,
+        totalFinal: `${i.total_final}% (${i.calificacion})`,
+        comentarios: i.comentarios ?? '—',
+      }));
 
-  return {
-    fechaInicio: this.formatDate(sprintData?.fecha_inicio),
-    fechaFin: this.formatDate(sprintData?.fecha_fin),
-    resumen,
-  };
-}
+    return {
+      fechaInicio: this.formatDate(sprintData?.fecha_inicio),
+      fechaFin: this.formatDate(sprintData?.fecha_fin),
+      resumen,
+    };
+  }
 
+  async createEquipo(nombre: string): Promise<{ id: string; nombre: string }> {
+    await this.login();
+
+    // Generar ID slug (misma lógica que el frontend)
+    const equipoId = nombre
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, '-');
+
+    // Verificar si ya existe
+    const equipoRef = doc(this.db, 'equipos', equipoId);
+    const equipoSnap = await getDoc(equipoRef);
+
+    if (equipoSnap.exists()) {
+      throw new Error('Ya existe un equipo con ese nombre');
+    }
+
+    // Crear equipo
+    await setDoc(equipoRef, { nombre });
+
+    return { id: equipoId, nombre };
+  }
+
+  async createPersonal(data: {
+    nombre: string;
+    rol: string;
+    correo?: string;
+    equipoId?: string;
+  }): Promise<{ id: string }> {
+    await this.login();
+
+    const personalRef = collection(this.db, 'personal');
+    const docRef = doc(personalRef);
+
+    const nuevoMiembro: any = {
+      nombre: data.nombre,
+      rol: data.rol,
+    };
+
+    // Agregar correo si existe
+    if (data.correo) {
+      nuevoMiembro.correo = data.correo;
+    }
+
+    // Agregar referencia al equipo si existe
+    if (data.equipoId) {
+      const equipoRef = doc(this.db, 'equipos', data.equipoId);
+      nuevoMiembro.equipo = equipoRef;
+    }
+
+    await setDoc(docRef, nuevoMiembro);
+
+    return { id: docRef.id };
+  }
 
 
 }
