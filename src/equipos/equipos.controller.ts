@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { EquiposService } from './equipos.service';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger'; import { FirebaseClient } from '../firebase/firebase.client';
+import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateEquipoDto } from './dto/create-equipo.dto';
 
 @ApiTags('Equipos')

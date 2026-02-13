@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
 import { PersonalService } from './personal.service';
-import { ApiParam, ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { get } from 'http';
+import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { CreatePersonalDto } from './dto/create-personal.dto';
 
 @ApiTags('Personal')
@@ -64,6 +63,13 @@ export class PersonalController {
 
     // Retornar array vacío si no hay personal, en lugar de 404
     return personal || [];
+  }
+
+  @Get('vacaciones')
+  @ApiOperation({ summary: 'Obtener personal actualmente en vacaciones' })
+  @ApiResponse({ status: 200, description: 'Lista de personal en vacaciones' })
+  async getVacaciones() {
+    return await this.personalService.getVacaciones();
   }
 
   @Get('personal')

@@ -111,6 +111,19 @@ export class FirebaseClient {
     }));
   }
 
+  async getPersonalOnVacation() {
+    await this.login();
+
+    const personalRef = collection(this.db, 'personal');
+    const q = query(personalRef, where('vacaciones', '==', true));
+    const snap = await getDocs(q);
+
+    return snap.docs.map(docu => ({
+      id: docu.id,
+      ...docu.data(),
+    }));
+  }
+
   async getEquipos() {
     await this.login();
     const equiposRef = collection(this.db, 'equipos');
@@ -121,6 +134,18 @@ export class FirebaseClient {
     }));
 
     return equiposDisponibles;
+  }
+
+  async searchTeamByName(name: string) {
+    await this.login();
+    const equiposRef = collection(this.db, 'equipos');
+    const q = query(equiposRef, where('nombre', '==', name));
+    const snap = await getDocs(q);
+
+    if (snap.empty) return null;
+
+    const doc = snap.docs[0];
+    return { id: doc.id, ...doc.data() };
   }
   async getEquipo(equipoId: string) {
     await this.login();
