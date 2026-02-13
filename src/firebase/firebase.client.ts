@@ -78,6 +78,15 @@ export class FirebaseClient {
     return { id: doc.id, ...doc.data() };
   }
 
+  async getPersonalById(id: string) {
+    await this.login();
+    const personalRef = doc(this.db, 'personal', id);
+    const personalSnap = await getDoc(personalRef);
+
+    if (!personalSnap.exists()) return null;
+    return { id: personalSnap.id, ...personalSnap.data() };
+  }
+
   async getPersonal() {
     await this.login();
 
@@ -374,6 +383,35 @@ export class FirebaseClient {
     await setDoc(docRef, nuevoMiembro);
 
     return { id: docRef.id };
+  }
+
+  async updatePersonalEquipo(personalId: string, equipoId: string) {
+    await this.login();
+    const personalRef = doc(this.db, 'personal', personalId);
+    const equipoRef = doc(this.db, 'equipos', equipoId);
+
+    await setDoc(personalRef, { equipo: equipoRef }, { merge: true });
+    return { ok: true };
+  }
+
+  async updatePersonalVacaciones(personalId: string, vacaciones: boolean) {
+    await this.login();
+    const personalRef = doc(this.db, 'personal', personalId);
+
+    await setDoc(personalRef, { vacaciones }, { merge: true });
+    return { ok: true };
+  }
+
+  async addHistorialRotacion(data: any) {
+    await this.login();
+    const historialRef = collection(this.db, 'historialRotaciones');
+
+    await setDoc(doc(historialRef), {
+      ...data,
+      fecha: new Date()
+    });
+
+    return { ok: true };
   }
 
 

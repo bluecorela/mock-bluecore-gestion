@@ -8,6 +8,7 @@ import { HistorialRotacionesModule } from './historial-rotaciones/historial-rota
 import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
 import { OperacionesModule } from './operaciones/operaciones.module';
 import { AdministracionDatosModule } from './administracion-datos/administracion-datos.module';
+import { RotacionModule } from './rotacion/rotacion.module';
 
 @Module({
   imports: [
@@ -19,9 +20,11 @@ import { AdministracionDatosModule } from './administracion-datos/administracion
     HistorialRotacionesModule,
     ModulosSidebarModule,
     OperacionesModule,
+    OperacionesModule,
     AdministracionDatosModule,
+    RotacionModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
