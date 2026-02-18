@@ -38,8 +38,10 @@ export class RotacionService {
         await this.firebaseClient.updatePersonalVacaciones(data.personalId, true);
 
         const personal = await this.firebaseClient.getPersonalById(data.personalId) as any;
+
+        // Fetch explícito para asegurar nombres
         const equipoOrigen = await this.firebaseClient.getEquipo(data.equipoOrigenId) as any;
-        const poolRef = { nombre: 'Pool de vacaciones' }; // Asumimos nombre fijo o buscamos si existe
+        if (!equipoOrigen) console.warn(`Vacaciones: Equipo origen ${data.equipoOrigenId} no encontrado`);
 
         // Logic for replacement if any
         if (data.reemplazoId) {
@@ -78,10 +80,22 @@ export class RotacionService {
 
         const personal = await this.firebaseClient.getPersonalById(data.personalId) as any;
         let equipoDestinoObj: any = null;
+        let equipoDestinoId = data.equipoDestinoId;
 
-        if (data.equipoDestinoId) {
-            await this.firebaseClient.updatePersonalEquipo(data.personalId, data.equipoDestinoId);
-            equipoDestinoObj = await this.firebaseClient.getEquipo(data.equipoDestinoId) as any;
+        if (equipoDestinoId) {
+            // Caso 1: Se especifica un nuevo equipo destino
+            await this.firebaseClient.updatePersonalEquipo(data.personalId, equipoDestinoId);
+            equipoDestinoObj = await this.firebaseClient.getEquipo(equipoDestinoId) as any;
+        } else {
+            // Caso 2: No se especifica, vuelve a su equipo original (resolviendo referencia)
+            if (personal && personal.equipo && personal.equipo.id) {
+                // personal.equipo es un DocumentReference
+                equipoDestinoId = personal.equipo.id;
+                equipoDestinoObj = await this.firebaseClient.getEquipo(equipoDestinoId!) as any;
+            } else {
+                console.warn(`Reintegrar: No se pudo determinar el equipo origen para ${data.personalId}`);
+                equipoDestinoId = 'indefinido';
+            }
         }
 
         await this.firebaseClient.addHistorialRotacion({
@@ -89,9 +103,9 @@ export class RotacionService {
             nombre: personal ? personal.nombre : 'Desconocido',
             tipo: 'reintegracion',
             desde: 'pool-de-vacaciones',
-            hacia: data.equipoDestinoId || '?',
+            hacia: equipoDestinoId || 'indefinido',
             desdeNombre: 'Pool de vacaciones',
-            haciaNombre: equipoDestinoObj ? equipoDestinoObj.nombre : (data.equipoDestinoId || '?'),
+            haciaNombre: equipoDestinoObj ? equipoDestinoObj.nombre : (equipoDestinoId || 'Indefinido'),
             fecha: new Date()
         });
 
