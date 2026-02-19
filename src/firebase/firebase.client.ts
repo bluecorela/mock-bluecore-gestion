@@ -414,5 +414,63 @@ export class FirebaseClient {
     return { ok: true };
   }
 
+  async savePerformanceEvaluacion(data: any) {
+    await this.login();
+    const { equipoId, numeroEvaluacion, nombreIngeniero } = data;
+    const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+    const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${numeroEvaluacion}/${docId}`;
+    const ref = doc(this.db, path);
 
+    await setDoc(ref, {
+      ...data,
+      fecha: new Date(),
+    });
+
+    return { ok: true };
+  }
+
+  async getPerformanceHistorial(equipoId: string) {
+    await this.login();
+    const allEvaluaciones: any[] = [];
+
+    // Iteramos hasta 10 evaluaciones como en el frontend actual
+    for (let i = 1; i <= 10; i++) {
+      const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${i}`;
+      const ref = collection(this.db, path);
+      const snap = await getDocs(ref);
+
+      if (!snap.empty) {
+        snap.docs.forEach(d => {
+          const data = d.data();
+          allEvaluaciones.push({
+            ...data,
+            numero: i,
+            fecha: data.fecha?.toDate?.() || data.fecha || new Date()
+          });
+        });
+      }
+    }
+
+    return allEvaluaciones;
+  }
+
+
+
+  async getPerformanceConfig() {
+    await this.login();
+    const docRef = doc(this.db, 'config_evaluaciones', 'performance');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data();
+    }
+    return null;
+  }
+
+  async savePerformanceConfig(data: any) {
+    await this.login();
+    const docRef = doc(this.db, 'config_evaluaciones', 'performance');
+    await setDoc(docRef, data);
+    return { ok: true };
+  }
 }
