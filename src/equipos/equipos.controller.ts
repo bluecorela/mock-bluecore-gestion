@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException, Query } from '@nestjs/common';
 import { EquiposService } from './equipos.service';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateEquipoDto } from './dto/create-equipo.dto';
@@ -26,12 +26,10 @@ export class EquiposController {
 
   @Get()
   @ApiOperation({ summary: 'Obtener todos los equipos' })
-
   @ApiResponse({ status: 200, description: 'Listado de equipos', })
   @ApiResponse({ status: 404, description: 'No existen equipos', })
-
-  async findAll() {
-    const data = await this.equiposService.findAll();
+  async findAll(@Query('soloConEvaluaciones') soloConEvaluaciones?: string) {
+    const data = await this.equiposService.findAll(soloConEvaluaciones === 'true');
 
     if (!data || data.length === 0) {
       throw new NotFoundException('No existen equipos');
@@ -39,6 +37,9 @@ export class EquiposController {
 
     return data
   }
+
+
+
 
   @Get(':equipoId/sprints')
   @ApiParam({
@@ -162,6 +163,13 @@ export class EquiposController {
     return metricas;
   }
 
-
+  @Get(':equipoId/estado-evaluacion')
+  @ApiOperation({ summary: 'Obtener estado actual de evaluación para el equipo' })
+  async getEstadoEvaluacion(
+    @Param('equipoId') equipoId: string,
+    @Param('sprintId') sprintId?: string
+  ) {
+    return this.equiposService.getSprintEvaluationStatus(equipoId, sprintId);
+  }
 
 }

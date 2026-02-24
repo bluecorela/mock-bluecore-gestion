@@ -6,9 +6,10 @@ import { CreateEquipoDto } from './dto/create-equipo.dto';
 export class EquiposService {
   constructor(private readonly firebaseClient: FirebaseClient) { }
 
-  async findAll() {
-    return this.firebaseClient.getEquipos();
+  async findAll(onlyWithEvaluations = false) {
+    return this.firebaseClient.getEquipos(onlyWithEvaluations);
   }
+
   async getSprintsByEquipo(equipoId: string) {
     const sprints = await this.firebaseClient.getSprintsByEquipo(equipoId);
     return sprints.map((s: any) => ({
@@ -16,7 +17,7 @@ export class EquiposService {
       nombre: s.id,
       fechaInicio: s.fecha_inicio?.toDate?.() ?? null,
       fechaFin: s.fecha_fin?.toDate?.() ?? null,
-      sprintsCerrado: s.sprint_cerrado?.toDate?.() ?? null,
+      sprintCerrado: s.sprint_cerrado ?? null,
     }));
   }
   async getIntegrantesBySprint(equipoId: string, sprintId: string) {
@@ -36,6 +37,10 @@ export class EquiposService {
 
   async create(createEquipoDto: CreateEquipoDto) {
     return this.firebaseClient.createEquipo(createEquipoDto.nombre);
+  }
+
+  async getSprintEvaluationStatus(equipoId: string, sprintId?: string) {
+    return this.firebaseClient.getSprintEvaluationStatus(equipoId, sprintId);
   }
 
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
-import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc, limit } from 'firebase/firestore';
 
 export interface ResumenIntegrante {
   nombre: string;
@@ -133,14 +133,38 @@ export class FirebaseClient {
     }));
   }
 
-  async getEquipos() {
+  async getEquipos(onlyWithEvaluations = false) {
     await this.login();
     const equiposRef = collection(this.db, 'equipos');
     const equiposSnap = await getDocs(equiposRef);
-    const equiposDisponibles = equiposSnap.docs.map(doc => ({
+    let equiposDisponibles = equiposSnap.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     }));
+
+    if (onlyWithEvaluations) {
+      const filtered: any[] = [];
+      for (const equipo of equiposDisponibles) {
+        // Verificar si tiene al menos un sprint con integrantes evaluados
+        const sprintsRef = collection(this.db, 'equipos', equipo.id, 'sprints');
+        const sprintsSnap = await getDocs(sprintsRef);
+
+        let hasEvaluations = false;
+        for (const sprintDoc of sprintsSnap.docs) {
+          const integrantesRef = collection(this.db, 'equipos', equipo.id, 'sprints', sprintDoc.id, 'Integrantes');
+          const integrantesSnap = await getDocs(query(integrantesRef, limit(1)));
+          if (!integrantesSnap.empty) {
+            hasEvaluations = true;
+            break;
+          }
+        }
+
+        if (hasEvaluations) {
+          filtered.push(equipo);
+        }
+      }
+      return filtered;
+    }
 
     return equiposDisponibles;
   }
@@ -203,7 +227,6 @@ export class FirebaseClient {
     if (!sprintSnap.exists()) {
       return null;
     }
-    //return { id: sprintSnap.id, ...sprintSnap.data() };
     return {
       id: sprintSnap.id,
       fecha_inicio: sprintSnap.data().fecha_inicio
@@ -212,7 +235,86 @@ export class FirebaseClient {
       fecha_fin: sprintSnap.data().fecha_fin
         ? sprintSnap.data().fecha_fin.toDate().toISOString()
         : null,
+      sprintCerrado: sprintSnap.data().sprint_cerrado ?? null
     };
+  }
+
+  async getSprintEvaluationStatus(equipoId: string, specificSprintId?: string) {
+    await this.login();
+
+    // 1. Obtener todos los sprints del equipo para encontrar el activo
+    const sprints = await this.getSprintsByEquipo(equipoId);
+
+    let activeSprint: any = null;
+
+    if (specificSprintId) {
+      activeSprint = sprints.find(s => s.id === specificSprintId);
+    } else {
+      // El primer sprint con sprint_cerrado !== true (ordenado por numero)
+      activeSprint = (sprints as any[])
+        .filter(s => s.sprint_cerrado !== true)
+        .sort((a, b) => this.getSprintNumero(a.id) - this.getSprintNumero(b.id))[0];
+    }
+
+    // Si no hay sprint activo pendiente, calculamos el "sprint + 1" del máximo existente
+    const maxSprintNum = sprints.reduce((max, s) => Math.max(max, this.getSprintNumero(s.id)), 0);
+    const sprintNumero = activeSprint ? this.getSprintNumero(activeSprint.id) : (maxSprintNum + 1);
+    const sprintId = activeSprint ? activeSprint.id : `sprint-${sprintNumero}`;
+
+    // 2. Obtener integrantes ya evaluados en este sprint
+    const evaluadosRaw = await this.getIntegrantesBySprint(equipoId, sprintId);
+    const evaluadosNombres = evaluadosRaw.map(e => e.nombre.toLowerCase().trim());
+
+    // 3. Obtener personal del equipo (base para pendientes)
+    const personal = await this.getPersonalByEquipo(equipoId);
+
+    // 4. Filtrar pendientes con la lógica de negocio completa
+    const integrantesEquipo = personal
+      .filter(p => {
+        const rol = String(p['rol'] || '').toLowerCase().trim();
+        const vacaciones = p['vacaciones'] === true;
+        const nombre = String(p['nombre'] || '').toLowerCase().trim();
+
+        // No evaluados aún
+        const yaEvaluado = evaluadosNombres.includes(nombre);
+
+        // Reglas de exclusión
+        const esArquitecto = rol === 'arquitecto';
+
+        // Regla de reemplazo (inicioReemplazoSprintId)
+        const inicioReemplazo = p['inicioReemplazoSprintId']
+          ? this.getSprintNumero(p['inicioReemplazoSprintId'])
+          : 0;
+        const habilitadoPorReemplazo = inicioReemplazo <= sprintNumero;
+
+        return !yaEvaluado && !esArquitecto && !vacaciones && habilitadoPorReemplazo;
+      })
+      .map(p => ({
+        nombre: p['nombre'],
+        rol: p['rol'],
+        vacaciones: p['vacaciones'] ?? false,
+        inicioReemplazoSprintId: p['inicioReemplazoSprintId'] ?? null
+      }));
+
+    // 5. Fechas del sprint (si ya existe)
+    let fechas = { fechaInicio: '', fechaFin: '' };
+    if (activeSprint) {
+      fechas.fechaInicio = activeSprint.fecha_inicio ? this.formatDate(activeSprint.fecha_inicio) : '';
+      fechas.fechaFin = activeSprint.fecha_fin ? this.formatDate(activeSprint.fecha_fin) : '';
+    }
+
+    return {
+      sprintId,
+      sprintNumero,
+      integrantesEquipo,
+      fechas,
+      sprintCerrado: activeSprint ? (activeSprint.sprint_cerrado === true) : false
+    };
+  }
+
+  private getSprintNumero(sprintId: string): number {
+    const parts = String(sprintId).split('-');
+    return parts.length > 1 ? parseInt(parts[1], 10) : 0;
   }
 
   async getHistorialRotaciones() {
@@ -264,6 +366,7 @@ export class FirebaseClient {
       await setDoc(sprintRef, {
         fecha_inicio: new Date(fechaInicio),
         fecha_fin: new Date(fechaFin),
+        sprint_cerrado: false,
       });
     }
 
@@ -283,8 +386,40 @@ export class FirebaseClient {
       { merge: true }
     );
 
-    return { ok: true };
+    // ────────────────────────────────────────────────────────────────
+    // Auto-cerrar sprint si ya se evaluaron todos los integrantes
+    // ────────────────────────────────────────────────────────────────
+    const integrantesRef = collection(this.db, 'equipos', equipoId, 'sprints', sprintId, 'Integrantes');
+    const integrantesSnap = await getDocs(integrantesRef);
+    const totalEvaluados = integrantesSnap.size;
+
+    // Calcular miembros esperados: personal del equipo excluye Arquitecto y vacaciones
+    const equipoDocRef = doc(this.db, 'equipos', equipoId);
+    const personalRef = collection(this.db, 'personal');
+    const personalSnap = await getDocs(
+      query(personalRef, where('equipo', '==', equipoDocRef))
+    );
+
+    const totalEsperados = personalSnap.docs
+      .map(d => d.data())
+      .filter(p => {
+        const rol = String(p['rol'] || '').toLowerCase().trim();
+        const vacaciones = p['vacaciones'] === true;
+        return rol !== 'arquitecto' && !vacaciones;
+      }).length;
+
+    let sprintCerrado = false;
+    if (totalEsperados > 0 && totalEvaluados >= totalEsperados) {
+      await setDoc(sprintRef, { sprint_cerrado: true }, { merge: true });
+      sprintCerrado = true;
+    }
+
+    // Retornar el nuevo estado para que el front se actualice automáticamente
+    const nextState = await this.getSprintEvaluationStatus(equipoId);
+
+    return { ok: true, sprintCerrado, nextState };
   }
+
 
   //Metodo para mostrar fechas en el formato correcto
   private formatDate(dateValue: any): string {
@@ -472,5 +607,61 @@ export class FirebaseClient {
     const docRef = doc(this.db, 'config_evaluaciones', 'performance');
     await setDoc(docRef, data);
     return { ok: true };
+  }
+
+  async getOtoConfig() {
+    await this.login();
+    const docRef = doc(this.db, 'config_evaluaciones', 'one-to-one');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return docSnap.data();
+    }
+    return null;
+  }
+
+  async saveOtoConfig(data: any) {
+    await this.login();
+    const docRef = doc(this.db, 'config_evaluaciones', 'one-to-one');
+    await setDoc(docRef, data);
+    return { ok: true };
+  }
+
+  async saveOtoEvaluacion(data: any) {
+    await this.login();
+    const { equipoId, numeroEvaluacion, nombreIngeniero } = data;
+    const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+    const path = `equipos/${equipoId}/evaluaciones/one-to-one/oto-${numeroEvaluacion}/${docId}`;
+    const ref = doc(this.db, path);
+
+    await setDoc(ref, {
+      ...data,
+      fecha: new Date(),
+    });
+
+    return { ok: true };
+  }
+
+  async getOtoHistorial(equipoId: string) {
+    await this.login();
+    const allEvaluaciones: any[] = [];
+
+    for (let i = 1; i <= 20; i++) {
+      const path = `equipos/${equipoId}/evaluaciones/one-to-one/oto-${i}`;
+      const ref = collection(this.db, path);
+      const snap = await getDocs(ref);
+
+      if (!snap.empty) {
+        snap.docs.forEach(d => {
+          const data = d.data();
+          allEvaluaciones.push({
+            ...data,
+            numero: i,
+            fecha: data.fecha?.toDate?.() || data.fechaSesion?.toDate?.() || data.fecha || new Date(),
+          });
+        });
+      }
+    }
+
+    return allEvaluaciones;
   }
 }

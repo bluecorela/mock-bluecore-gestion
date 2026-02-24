@@ -9,6 +9,7 @@ import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
 import { OperacionesModule } from './operaciones/operaciones.module';
 import { AdministracionDatosModule } from './administracion-datos/administracion-datos.module';
 import { RotacionModule } from './rotacion/rotacion.module';
+import { OtoModule } from './oto/oto.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RotacionModule } from './rotacion/rotacion.module';
     OperacionesModule,
     AdministracionDatosModule,
     RotacionModule,
+    OtoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
