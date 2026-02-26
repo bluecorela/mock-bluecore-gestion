@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { FirebaseClient } from '../firebase/firebase.client';
 
 @Injectable()
-export class HistorialRotacionesService {
-  constructor(private readonly firebaseClient: FirebaseClient) {}
+export class RotacionHistorialService {
+  constructor(private readonly firebaseClient: FirebaseClient) { }
 
   async findAll() {
     const historial = await this.firebaseClient.getHistorialRotaciones();

@@ -4,6 +4,7 @@ import { OperacionesService } from './operaciones.service';
 
 @Module({
   controllers: [OperacionesController],
-  providers: [OperacionesService]
+  providers: [OperacionesService],
+  exports: [OperacionesService]
 })
-export class OperacionesModule {}
+export class OperacionesModule { }

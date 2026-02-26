@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { EquiposService } from './equipos.service';
 import { EquiposController } from './equipos.controller';
 import { FirebaseModule } from '../firebase/firebase-client.module';
+import { OperacionesModule } from '../operaciones/operaciones.module';
 
 @Module({
-  imports: [FirebaseModule],
+  imports: [FirebaseModule, OperacionesModule],
   controllers: [EquiposController],
   providers: [EquiposService],
 })
-export class EquiposModule {}
+export class EquiposModule { }

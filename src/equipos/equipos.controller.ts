@@ -38,6 +38,19 @@ export class EquiposController {
     return data
   }
 
+  @Get(':equipoId/dashboard')
+  @ApiOperation({ summary: 'Obtener datos consolidados para el dashboard del equipo' })
+  @ApiParam({ name: 'equipoId', type: String, example: 'sgb-evolucion' })
+  @ApiResponse({ status: 200, description: 'Datos del dashboard' })
+  @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
+  async getDashboard(@Param('equipoId') equipoId: string) {
+    const data = await this.equiposService.getDashboardData(equipoId);
+    if (!data) {
+      throw new NotFoundException('Equipo no encontrado');
+    }
+    return data;
+  }
+
 
 
 
