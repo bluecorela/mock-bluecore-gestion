@@ -296,11 +296,23 @@ export class FirebaseClient {
         inicioReemplazoSprintId: p['inicioReemplazoSprintId'] ?? null
       }));
 
-    // 5. Fechas del sprint (si ya existe)
+    // 5. Fechas del sprint (si ya existe) en formato ISO para el input date del front
     let fechas = { fechaInicio: '', fechaFin: '' };
     if (activeSprint) {
-      fechas.fechaInicio = activeSprint.fecha_inicio ? this.formatDate(activeSprint.fecha_inicio) : '';
-      fechas.fechaFin = activeSprint.fecha_fin ? this.formatDate(activeSprint.fecha_fin) : '';
+      fechas.fechaInicio = activeSprint.fecha_inicio ? new Date(activeSprint.fecha_inicio.seconds * 1000).toISOString().split('T')[0] : '';
+      fechas.fechaFin = activeSprint.fecha_fin ? new Date(activeSprint.fecha_fin.seconds * 1000).toISOString().split('T')[0] : '';
+    } else {
+      // Sugerir fechas de la semana actual si es un sprint nuevo
+      const hoy = new Date();
+      const diaSemana = hoy.getDay(); // 0 (Dom) a 6 (Sab)
+      const lunes = new Date(hoy);
+      lunes.setDate(hoy.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
+
+      const viernes = new Date(lunes);
+      viernes.setDate(lunes.getDate() + 4);
+
+      fechas.fechaInicio = lunes.toISOString().split('T')[0];
+      fechas.fechaFin = viernes.toISOString().split('T')[0];
     }
 
     return {
@@ -337,6 +349,13 @@ export class FirebaseClient {
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter((modulo: any) => Array.isArray(modulo.rolesPermitidos) &&
         modulo.rolesPermitidos.includes(rol));
+
+    // Si el rol es Admin, filtrar los módulos que no deben mostrarse por ahora
+    if (rol === 'Admin') {
+      const modulosADeshabilitar = ['Gestor de Noticias', 'Documentos'];
+      return modulosData.filter((m: any) => !modulosADeshabilitar.includes(m.nombre));
+    }
+
     return modulosData;
   }
 
@@ -561,6 +580,20 @@ export class FirebaseClient {
       fecha: new Date(),
     });
 
+    // Actualizar progreso de la habilitación si existe
+    const habilitacionActiva = await this.getHabilitacionActiva(equipoId);
+    if (habilitacionActiva) {
+      const habilitacionRef = doc(this.db, 'habilitaciones_desempeno', (habilitacionActiva as any).id);
+      const evaluadosCount = ((habilitacionActiva as any).evaluadosCount || 0) + 1;
+      const totalEsperados = (habilitacionActiva as any).totalEsperados || 0;
+
+      await setDoc(habilitacionRef, {
+        evaluadosCount,
+        estado: evaluadosCount >= totalEsperados ? 'Completado' : 'En proceso',
+        ultimaActualizacion: new Date()
+      }, { merge: true });
+    }
+
     return { ok: true };
   }
 
@@ -663,5 +696,94 @@ export class FirebaseClient {
     }
 
     return allEvaluaciones;
+  }
+
+  async habilitarPerformance(equipoId: string, nombreAdmin: string) {
+    await this.login();
+
+    // Verificar si ya existe una habilitación activa para este equipo
+    const existente = await this.getHabilitacionActiva(equipoId);
+    if (existente) {
+      // Ya existe una habilitación activa, retornarla sin crear duplicado
+      return existente;
+    }
+
+    // 1. Obtener integrantes del equipo para saber cuántos se esperan evaluar
+    const personal = await this.getPersonalByEquipo(equipoId);
+    const totalEsperados = personal.filter(p =>
+      !['Arquitecto', 'Admin'].includes(String(p['rol'] || ''))
+    ).length;
+
+    const equipo = await this.getEquipo(equipoId);
+
+    const docRef = doc(collection(this.db, 'habilitaciones_desempeno'));
+    const data = {
+      equipoId,
+      nombreEquipo: (equipo as any)?.nombre || equipoId,
+      nombreAdmin,
+      fechaHabilitacion: new Date(),
+      estado: 'Pendiente',
+      evaluadosCount: 0,
+      totalEsperados,
+    };
+
+    await setDoc(docRef, data);
+    return { id: docRef.id, ...data };
+  }
+
+  async getHabilitacionesPerformance(equipoId?: string) {
+    await this.login();
+    const habilitacionesRef = collection(this.db, 'habilitaciones_desempeno');
+    let q = query(habilitacionesRef);
+
+    if (equipoId) {
+      q = query(habilitacionesRef, where('equipoId', '==', equipoId));
+    }
+
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      fechaHabilitacion: (d.data() as any).fechaHabilitacion?.toDate?.() || (d.data() as any).fechaHabilitacion
+    })).sort((a, b) => {
+      const dateA = a.fechaHabilitacion?.getTime?.() || 0;
+      const dateB = b.fechaHabilitacion?.getTime?.() || 0;
+      return dateB - dateA;
+    });
+  }
+
+  async getHabilitacionActiva(equipoId: string) {
+    await this.login();
+    const habilitacionesRef = collection(this.db, 'habilitaciones_desempeno');
+    const q = query(
+      habilitacionesRef,
+      where('equipoId', '==', equipoId),
+      where('estado', 'in', ['Pendiente', 'En proceso'])
+    );
+
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+
+    const docs = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      fechaHabilitacion: (d.data() as any).fechaHabilitacion?.toDate?.() || (d.data() as any).fechaHabilitacion
+    })).sort((a, b) => {
+      const dateA = a.fechaHabilitacion?.getTime?.() || 0;
+      const dateB = b.fechaHabilitacion?.getTime?.() || 0;
+      return dateB - dateA;
+    });
+
+    return docs[0];
+  }
+
+  async getMaintenanceStatus() {
+    await this.login();
+    const docRef = doc(this.db, 'settings/maintenance');
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      return snap.data();
+    }
+    return { active: false };
   }
 }

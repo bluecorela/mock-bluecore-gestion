@@ -137,4 +137,16 @@ export class PerformanceService {
     async getHistorial(equipoId: string) {
         return this.firebaseClient.getPerformanceHistorial(equipoId);
     }
+
+    async habilitarEvaluacion(equipoId: string, nombreAdmin: string) {
+        return this.firebaseClient.habilitarPerformance(equipoId, nombreAdmin);
+    }
+
+    async getHabilitaciones(equipoId?: string) {
+        return this.firebaseClient.getHabilitacionesPerformance(equipoId);
+    }
+
+    async getHabilitacionActiva(equipoId: string) {
+        return this.firebaseClient.getHabilitacionActiva(equipoId);
+    }
 }

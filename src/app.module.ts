@@ -11,6 +11,7 @@ import { AdministracionDatosModule } from './administracion-datos/administracion
 import { RotacionModule } from './rotacion/rotacion.module';
 import { OtoModule } from './oto/oto.module';
 import { PerformanceModule } from './performance/performance.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PerformanceModule } from './performance/performance.module';
     RotacionModule,
     OtoModule,
     PerformanceModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],

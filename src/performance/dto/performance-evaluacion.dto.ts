@@ -29,7 +29,7 @@ export class CreatePerformanceEvaluacionDto {
     @IsNotEmpty()
     nombreIngeniero: string;
 
-    @ApiProperty({ description: 'Periodo de evaluación', example: 'Performance Semestral' })
+    @ApiProperty({ description: 'Periodo de evaluación', example: 'Performance Anual' })
     @IsString()
     @IsNotEmpty()
     periodo: string;

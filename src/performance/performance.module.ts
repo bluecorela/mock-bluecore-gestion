@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PerformanceService } from './performance.service';
 import { PerformanceController } from './performance.controller';
-import { FirebaseModule } from '../firebase/firebase-client.module';
+import { FirebaseClientModule } from '../firebase/firebase-client.module';
 
 @Module({
-    imports: [FirebaseModule],
+    imports: [FirebaseClientModule],
     controllers: [PerformanceController],
     providers: [PerformanceService],
     exports: [PerformanceService],

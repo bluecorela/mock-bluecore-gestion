@@ -5,4 +5,4 @@ import { FirebaseClient } from './firebase.client';
   providers: [FirebaseClient],
   exports: [FirebaseClient],
 })
-export class FirebaseModule {}
+export class FirebaseClientModule { }

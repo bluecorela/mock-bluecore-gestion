@@ -15,12 +15,12 @@ export class OtoController {
         return this.otoService.getConfig();
     }
 
-    @Post('seed')
-    @ApiOperation({ summary: 'Importar configuración inicial de One to One a Firestore (ejecutar una sola vez)' })
-    @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
-    async seedConfig() {
-        return this.otoService.seedConfig();
-    }
+    // @Post('seed')
+    // @ApiOperation({ summary: 'Importar configuración inicial de One to One a Firestore (ejecutar una sola vez)' })
+    // @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
+    // async seedConfig() {
+    //     return this.otoService.seedConfig();
+    // }
 
     @Post()
     @ApiOperation({ summary: 'Guardar una evaluación One to One' })

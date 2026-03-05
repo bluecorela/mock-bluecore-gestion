@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, BadRequestException, Query } from '@nestjs/common';
 import { PerformanceService } from './performance.service';
 import { CreatePerformanceEvaluacionDto } from './dto/performance-evaluacion.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -35,5 +35,26 @@ export class PerformanceController {
     async getHistorial(@Param('equipoId') equipoId: string) {
         if (!equipoId) throw new BadRequestException('El equipoId es obligatorio');
         return this.performanceService.getHistorial(equipoId);
+    }
+
+    @Post('habilitar')
+    @ApiOperation({ summary: 'Habilitar un nuevo periodo de evaluación para un equipo' })
+    async habilitar(@Body() body: { equipoId: string, nombreAdmin: string }) {
+        if (!body.equipoId || !body.nombreAdmin) {
+            throw new BadRequestException('equipoId y nombreAdmin son obligatorios');
+        }
+        return this.performanceService.habilitarEvaluacion(body.equipoId, body.nombreAdmin);
+    }
+
+    @Get('habilitaciones')
+    @ApiOperation({ summary: 'Listar historial de habilitaciones de evaluaciones' })
+    async getHabilitaciones(@Query('equipoId') equipoId?: string) {
+        return this.performanceService.getHabilitaciones(equipoId);
+    }
+
+    @Get('habilitacion-activa/:equipoId')
+    @ApiOperation({ summary: 'Obtener la habilitación activa para un equipo' })
+    async getHabilitacionActiva(@Param('equipoId') equipoId: string) {
+        return this.performanceService.getHabilitacionActiva(equipoId);
     }
 }

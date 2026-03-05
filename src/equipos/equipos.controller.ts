@@ -52,8 +52,6 @@ export class EquiposController {
   }
 
 
-
-
   @Get(':equipoId/sprints')
   @ApiParam({
     name: 'equipoId',
@@ -73,11 +71,6 @@ export class EquiposController {
     }
 
     const sprints = await this.equiposService.getSprintsByEquipo(equipoId);
-
-    if (!sprints || sprints.length === 0) {
-      throw new NotFoundException('No existen sprints para este equipo');
-    }
-
     return sprints;
   }
 
