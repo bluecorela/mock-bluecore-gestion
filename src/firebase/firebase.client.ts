@@ -570,13 +570,19 @@ export class FirebaseClient {
 
   async savePerformanceEvaluacion(data: any) {
     await this.login();
-    const { equipoId, numeroEvaluacion, nombreIngeniero } = data;
+    const { equipoId, nombreIngeniero } = data;
     const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+
+    // Auto-detect: find the correct collection number
+    const numeroEvaluacion = await this.findNextPerformanceCollection(equipoId, docId);
+    console.log(`[Performance] Auto-detected collection: performance-${numeroEvaluacion} for ${docId}`);
+
     const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${numeroEvaluacion}/${docId}`;
     const ref = doc(this.db, path);
 
     await setDoc(ref, {
       ...data,
+      numeroEvaluacion,
       fecha: new Date(),
     });
 
@@ -594,7 +600,41 @@ export class FirebaseClient {
       }, { merge: true });
     }
 
-    return { ok: true };
+    return { ok: true, numeroEvaluacion };
+  }
+
+  /**
+   * Scans existing performance-N collections to find where to save.
+   * If the member already exists in the latest collection → returns N+1.
+   * If the member does NOT exist in the latest collection → returns that N.
+   * If no collections exist → returns 1.
+   */
+  private async findNextPerformanceCollection(equipoId: string, docId: string): Promise<number> {
+    let lastNonEmpty = 0;
+
+    for (let i = 1; i <= 20; i++) {
+      const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${i}`;
+      const ref = collection(this.db, path);
+      const snap = await getDocs(ref);
+
+      if (snap.empty) break;
+      lastNonEmpty = i;
+
+      // Check if this specific member already has a doc here
+      const memberDoc = doc(this.db, `${path}/${docId}`);
+      const memberSnap = await getDoc(memberDoc);
+
+      if (!memberSnap.exists()) {
+        // Member doesn't exist in this collection yet → save here
+        return i;
+      }
+    }
+
+    // If no collections exist, start at 1
+    if (lastNonEmpty === 0) return 1;
+
+    // Member exists in the latest collection → create next one
+    return lastNonEmpty + 1;
   }
 
   async getPerformanceHistorial(equipoId: string) {
@@ -661,17 +701,55 @@ export class FirebaseClient {
 
   async saveOtoEvaluacion(data: any) {
     await this.login();
-    const { equipoId, numeroEvaluacion, nombreIngeniero } = data;
+    const { equipoId, nombreIngeniero } = data;
     const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+
+    // Auto-detect: find the correct collection number
+    const numeroEvaluacion = await this.findNextOtoCollection(equipoId, docId);
+    console.log(`[OTO] Auto-detected collection: one-to-one-${numeroEvaluacion} for ${docId}`);
+
     const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${numeroEvaluacion}/${docId}`;
     const ref = doc(this.db, path);
 
     await setDoc(ref, {
       ...data,
+      numeroEvaluacion,
       fecha: new Date(),
     });
 
-    return { ok: true };
+    return { ok: true, numeroEvaluacion };
+  }
+
+  /**
+   * Scans existing one-to-one-N collections to find where to save.
+   * Same logic as performance: if member already exists in latest → N+1.
+   */
+  private async findNextOtoCollection(equipoId: string, docId: string): Promise<number> {
+    let lastNonEmpty = 0;
+
+    for (let i = 1; i <= 30; i++) {
+      const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${i}`;
+      const ref = collection(this.db, path);
+      const snap = await getDocs(ref);
+
+      if (snap.empty) break;
+      lastNonEmpty = i;
+
+      // Check if this specific member already has a doc here
+      const memberDoc = doc(this.db, `${path}/${docId}`);
+      const memberSnap = await getDoc(memberDoc);
+
+      if (!memberSnap.exists()) {
+        // Member doesn't exist in this collection yet → save here
+        return i;
+      }
+    }
+
+    // If no collections exist, start at 1
+    if (lastNonEmpty === 0) return 1;
+
+    // Member exists in the latest collection → create next one
+    return lastNonEmpty + 1;
   }
 
   async getOtoHistorial(equipoId: string) {
