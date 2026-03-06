@@ -16,12 +16,12 @@ export class PerformanceController {
         return this.performanceService.getConfig();
     }
 
-    // @Post('seed')
-    // @ApiOperation({ summary: 'Importar configuración inicial de preguntas a Firestore' })
-    // @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
-    // async seedConfig() {
-    //     return this.performanceService.seedConfig();
-    // }
+    @Post('seed')
+    @ApiOperation({ summary: 'Importar configuración inicial de preguntas a Firestore' })
+    @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
+    async seedConfig() {
+        return this.performanceService.seedConfig();
+    }
 
     @Post()
     @ApiOperation({ summary: 'Guardar una evaluación de desempeño' })
