@@ -663,7 +663,7 @@ export class FirebaseClient {
     await this.login();
     const { equipoId, numeroEvaluacion, nombreIngeniero } = data;
     const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
-    const path = `equipos/${equipoId}/evaluaciones/one-to-one/oto-${numeroEvaluacion}/${docId}`;
+    const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${numeroEvaluacion}/${docId}`;
     const ref = doc(this.db, path);
 
     await setDoc(ref, {
@@ -679,7 +679,7 @@ export class FirebaseClient {
     const allEvaluaciones: any[] = [];
 
     for (let i = 1; i <= 20; i++) {
-      const path = `equipos/${equipoId}/evaluaciones/one-to-one/oto-${i}`;
+      const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${i}`;
       const ref = collection(this.db, path);
       const snap = await getDocs(ref);
 
