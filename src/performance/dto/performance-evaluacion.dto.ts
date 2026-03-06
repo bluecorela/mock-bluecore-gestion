@@ -59,8 +59,8 @@ export class CreatePerformanceEvaluacionDto {
     @IsNotEmpty()
     retroalimentacionConfirmada: boolean;
 
-    @ApiProperty({ description: 'Número de evaluación (1, 2, etc.)', example: 1 })
+    @ApiProperty({ description: 'Número de evaluación (1, 2, etc.)', example: 1, required: false })
     @IsNumber()
-    @IsNotEmpty()
-    numeroEvaluacion: number;
+    @IsOptional()
+    numeroEvaluacion?: number;
 }

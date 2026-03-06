@@ -56,10 +56,10 @@ export class CreateOtoEvaluacionDto {
     @IsNotEmpty()
     nombreIngeniero: string;
 
-    @ApiProperty({ description: 'Número de evaluación (1, 2, etc.)', example: 1 })
+    @ApiProperty({ description: 'Número de evaluación (1, 2, etc.)', example: 1, required: false })
     @IsNumber()
-    @IsNotEmpty()
-    numeroEvaluacion: number;
+    @IsOptional()
+    numeroEvaluacion?: number;
 
     @ApiProperty({ description: 'Periodo de evaluación', example: 'Sprint 1 al Sprint 4' })
     @IsString()
