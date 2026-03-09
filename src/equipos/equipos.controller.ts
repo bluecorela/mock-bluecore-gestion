@@ -178,4 +178,10 @@ export class EquiposController {
     return this.equiposService.getSprintEvaluationStatus(equipoId, sprintId);
   }
 
+  @Post('sprint-evaluacion')
+  @ApiOperation({ summary: 'Guardar evaluación de sprint para un integrante' })
+  @ApiResponse({ status: 201, description: 'Evaluación de sprint guardada exitosamente' })
+  async guardarEvaluacionSprint(@Body() body: any) {
+    return this.equiposService.guardarEvaluacion(body);
+  }
 }

@@ -167,4 +167,7 @@ export class EquiposService {
     return this.firebaseClient.getSprintEvaluationStatus(equipoId, sprintId);
   }
 
+  async guardarEvaluacion(data: any) {
+    return this.firebaseClient.guardarEvaluacion(data);
+  }
 }

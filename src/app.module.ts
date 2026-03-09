@@ -7,7 +7,6 @@ import { EquiposModule } from './equipos/equipos.module';
 import { RotacionHistorialModule } from './rotacion-historial/rotacion-historial.module';
 import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
 import { OperacionesModule } from './operaciones/operaciones.module';
-import { AdministracionDatosModule } from './administracion-datos/administracion-datos.module';
 import { RotacionModule } from './rotacion/rotacion.module';
 import { OtoModule } from './oto/oto.module';
 import { PerformanceModule } from './performance/performance.module';
@@ -23,7 +22,6 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     RotacionHistorialModule,
     ModulosSidebarModule,
     OperacionesModule,
-    AdministracionDatosModule,
     RotacionModule,
     OtoModule,
     PerformanceModule,
