@@ -320,6 +320,7 @@ export class FirebaseClient {
       sprintNumero,
       integrantesEquipo,
       fechas,
+      fechasGuardadas: !!activeSprint, // Flag to indicate if we are in an already created sprint
       sprintCerrado: activeSprint ? (activeSprint.sprint_cerrado === true) : false
     };
   }
