@@ -1,11 +1,20 @@
-import { Controller, Get, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
 import { PersonalService } from './personal.service';
-import { ApiParam, ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { CreatePersonalDto } from './dto/create-personal.dto';
 
 @ApiTags('Personal')
 @Controller('personal')
 export class PersonalController {
   constructor(private readonly personalService: PersonalService) { }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo miembro del personal' })
+  @ApiResponse({ status: 201, description: 'Miembro creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o validación de negocio fallida' })
+  async create(@Body() createPersonalDto: CreatePersonalDto) {
+    return await this.personalService.create(createPersonalDto);
+  }
 
   @Get()
   @ApiOperation({ summary: 'Obtener información del usuario' })
@@ -33,5 +42,50 @@ export class PersonalController {
     }
 
     return personal;
+  }
+  @Get('equipo')
+  @ApiOperation({ summary: 'Obtener personal por equipo' })
+  @ApiQuery({
+    name: 'equipoId',
+    required: true,
+    type: String,
+    example: 'sgb-evolucion',
+    description: 'ID del equipo',
+  })
+  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado (puede ser un array vacío)' })
+  @ApiResponse({ status: 400, description: 'El ID del equipo es obligatorio' })
+
+  async findEquipo(@Query('equipoId') equipoId?: string) {
+    if (!equipoId) {
+      throw new BadRequestException('El parámetro "equipoId" es obligatorio');
+    }
+    const personal = await this.personalService.findEquipo(equipoId);
+
+    // Retornar array vacío si no hay personal, en lugar de 404
+    return personal || [];
+  }
+
+  @Get('vacaciones')
+  @ApiOperation({ summary: 'Obtener personal actualmente en vacaciones' })
+  @ApiResponse({ status: 200, description: 'Lista de personal en vacaciones' })
+  async getVacaciones() {
+    return await this.personalService.getVacaciones();
+  }
+
+  @Get('personal')
+  @ApiOperation({ summary: 'Obtener todo el personal' })
+  @ApiResponse({ status: 200, description: 'Lista de todo el personal' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiResponse({ status: 404, description: 'No se encontró personal' })
+  async findAll() {
+
+    const personal = await this.personalService.findAll();
+
+    if (!personal) {
+      throw new NotFoundException('No se encontró personal');
+    }
+
+    return personal;
+
   }
 }

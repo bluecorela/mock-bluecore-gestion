@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ModulosSidebarService } from './modulos-sidebar.service';
 import { ModulosSidebarController } from './modulos-sidebar.controller';
-import { FirebaseModule } from '../firebase/firebase-client.module';
+import { FirebaseClientModule } from '../firebase/firebase-client.module';
 
 @Module({
-  imports: [FirebaseModule],
+  imports: [FirebaseClientModule],
   providers: [ModulosSidebarService],
   controllers: [ModulosSidebarController]
 })
-export class ModulosSidebarModule {}
+export class ModulosSidebarModule { }
