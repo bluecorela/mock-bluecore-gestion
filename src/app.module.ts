@@ -4,10 +4,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PersonalModule } from './personal/personal.module';
 import { EquiposModule } from './equipos/equipos.module';
-import { HistorialRotacionesModule } from './historial-rotaciones/historial-rotaciones.module';
+import { RotacionHistorialModule } from './rotacion-historial/rotacion-historial.module';
 import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
 import { OperacionesModule } from './operaciones/operaciones.module';
-import { AdministracionDatosModule } from './administracion-datos/administracion-datos.module';
+import { RotacionModule } from './rotacion/rotacion.module';
+import { OtoModule } from './oto/oto.module';
+import { PerformanceModule } from './performance/performance.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -16,12 +19,15 @@ import { AdministracionDatosModule } from './administracion-datos/administracion
     }),
     PersonalModule,
     EquiposModule,
-    HistorialRotacionesModule,
+    RotacionHistorialModule,
     ModulosSidebarModule,
     OperacionesModule,
-    AdministracionDatosModule,
+    RotacionModule,
+    OtoModule,
+    PerformanceModule,
+    MaintenanceModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

@@ -96,7 +96,7 @@ export class OperacionesService {
                 new Date(b.fechaInicio ?? 0).getTime()
         );
 
-        const ultimos = ordenados.slice(-8).reverse();
+        const ultimos = ordenados.slice(-8);
 
         const labels: string[] = [];
         const valores: number[] = [];
@@ -133,6 +133,8 @@ export class OperacionesService {
         };
 
     }
+
+
 
 }
 

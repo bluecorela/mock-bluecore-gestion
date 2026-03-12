@@ -1,12 +1,12 @@
 import { Controller, Get, NotFoundException } from '@nestjs/common';
-import { HistorialRotacionesService } from './historial-rotaciones.service';
+import { RotacionHistorialService } from './rotacion-historial.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Historial Rotaciones')
-@Controller('historial-rotaciones')
-export class HistorialRotacionesController {
+@Controller('rotacion-historial')
+export class RotacionHistorialController {
     constructor(
-        private readonly historialRotacionesService: HistorialRotacionesService,
+        private readonly rotacionHistorialService: RotacionHistorialService,
     ) { }
 
     @Get()
@@ -14,9 +14,9 @@ export class HistorialRotacionesController {
 
     @ApiResponse({ status: 200, description: 'Listado de historial de rotaciones', })
     @ApiResponse({ status: 404, description: 'No existen registros de historial', })
-    
+
     async findAll() {
-        const data = await this.historialRotacionesService.findAll();
+        const data = await this.rotacionHistorialService.findAll();
 
         if (!data || data.length === 0) {
             throw new NotFoundException('No existen registros de historial');
