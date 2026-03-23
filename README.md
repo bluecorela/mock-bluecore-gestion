@@ -1,27 +1,34 @@
-# Mock Bluecore Gestion
+# Mock Bluecore Gestión — Backend API
 
-A NestJS-based backend API for managing teams, personnel, and rotation history, integrated with Firebase for data storage and authentication.
+API backend construida con NestJS para el portal de gestión interna de Bluecore. Gestiona equipos, personal, evaluaciones de desempeño, sesiones One to One, rotaciones y métricas de rendimiento, integrado con Firebase Firestore como base de datos.
 
 ## Features
 
-- **Authentication**: Secure user authentication module.
-- **Teams Management**: CRUD operations for managing teams (equipos).
-- **Personnel Management**: Manage personnel data and assignments.
-- **Rotation History**: Track and manage historical rotations.
-- **Firebase Integration**: Uses Firebase for database and client services.
+- **Teams Management**: CRUD de equipos, sprints, integrantes y dashboard consolidado con métricas de rendimiento.
+- **Personnel Management**: Gestión de personal, asignación a equipos, control de vacaciones y reemplazos.
+- **Sprint Evaluation**: Registro de evaluaciones por sprint con auto-cierre cuando todos los integrantes han sido evaluados.
+- **Performance Evaluation**: Evaluaciones de desempeño con habilitación por Admin, historial por periodo y configuración dinámica de preguntas.
+- **One to One (OTO)**: Sesiones individuales cada 4 sprints con configuración dinámica, historial y exportación.
+- **Rotation Management**: Control de rotaciones entre equipos con historial completo.
+- **Operations Engine**: Cálculo centralizado de promedios de rendimiento, tendencias y calificaciones por sprint.
+- **Dynamic Sidebar**: Módulos de navegación controlados por rol desde Firestore.
+- **Maintenance Mode**: Endpoint para activar/desactivar modo mantenimiento global.
+- **Firebase Integration**: Firestore como base de datos, Firebase Auth para autenticación de servicio.
+- **Auto-Increment Protection**: Detección automática de colecciones para evitar sobrescritura de datos históricos.
 
 ## Prerequisites
 
 - Node.js (version 18 or higher)
 - npm or yarn
-- Firebase project setup (for Firebase integration)
+- Firebase project with Firestore and Authentication enabled
+- Service account credentials or email/password for Firebase Auth
 
 ## Installation
 
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd mock_bluecore_gestion
+   cd mock-bluecore-gestion
    ```
 
 2. Install dependencies:
@@ -32,6 +39,16 @@ A NestJS-based backend API for managing teams, personnel, and rotation history, 
 3. Set up environment variables:
    Create a `.env` file in the root directory and configure your Firebase credentials and other necessary variables.
 
+   EXAMPLE:
+```
+   FIREBASE_API_KEY=your_api_key
+   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   FIREBASE_PROJECT_ID=your_project_id
+   FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   FIREBASE_APP_ID=your_app_id
+   FIREBASE_EMAIL=service_account@email.com
+   FIREBASE_PASSWORD=your_password
+```
 ## Running the Application
 
 ```bash
@@ -83,31 +100,80 @@ npm run format
 
 The API provides endpoints for:
 
-- `/auth` - Authentication routes
-- `/equipos` - Teams management
-- `/personal` - Personnel management
-- `/historial-rotaciones` - Rotation history
+- **Teams (/equipos)**
+- **Personnel (/personal)**
+- **Performance (/performance)**
+- **One to One (/oto)**
+- **Rotation (/rotacion)**
+- **Rotation History (/rotacion-historial)**
+- **Sidebar Modules (/modulos-sidebar)**
+- **Maintenance (/maintenance)**
 
-For detailed API documentation, refer to the Swagger/OpenAPI specs if available, or check the controller files in the `src/` directory.
+For detailed API documentation and testing, refer to the Swagger/OpenAPI specs if available, or check the controller files in the `src/` directory.
+
+Swagger URL: https://bluecore-gestion-api.bluecorela.com/api/Docs#
 
 ## Project Structure
 
 ```
 src/
-├── app.controller.ts
-├── app.module.ts
-├── app.service.ts
-├── auth/
-├── equipos/
+├── main.ts                    # Entry point & CORS configuration
+├── app.module.ts              # Root module
+├── app.controller.ts          # Health check
+├── app.service.ts             # Base service
 ├── firebase/
-├── historial-rotaciones/
-├── interfaces/
-├── main.ts
-└── personal/
-test/
-├── app.e2e-spec.ts
-└── jest-e2e.json
+│   └── firebase.client.ts     # Firebase Firestore client (core data layer)
+├── equipos/
+│   ├── equipos.controller.ts  # Teams & Sprints endpoints
+│   ├── equipos.service.ts     # Dashboard, metrics & evaluation logic
+│   ├── equipos.module.ts
+│   └── dto/
+├── personal/
+│   ├── personal.controller.ts # Personnel endpoints
+│   ├── personal.service.ts
+│   ├── personal.module.ts
+│   └── dto/
+├── performance/
+│   ├── performance.controller.ts  # Performance evaluation endpoints
+│   ├── performance.service.ts     # Evaluation & enablement logic
+│   ├── performance.module.ts
+│   └── dto/
+├── oto/
+│   ├── oto.controller.ts      # One to One endpoints
+│   ├── oto.service.ts         # OTO calculation & history logic
+│   ├── oto.module.ts
+│   └── dto/
+├── operaciones/
+│   └── operaciones.service.ts # Centralized performance calculations
+├── rotacion/
+│   ├── rotacion.controller.ts
+│   ├── rotacion.service.ts
+│   └── rotacion.module.ts
+├── rotacion-historial/
+│   ├── rotacion-historial.controller.ts
+│   ├── rotacion-historial.service.ts
+│   └── rotacion-historial.module.ts
+├── modulos-sidebar/
+│   ├── modulos-sidebar.controller.ts
+│   ├── modulos-sidebar.service.ts
+│   └── modulos-sidebar.module.ts
+└── maintenance/
+    ├── maintenance.controller.ts
+    ├── maintenance.service.ts
+    └── maintenance.module.ts
+
 ```
+## Key Business Logic
+
+Performance Metrics (Cuadro de Sprints)
+The scoring formula for sprint evaluations is calculated on the frontend and stored via the API:
+
+Total Final = (Entregadas/Asignadas) × 0.4 + (Netas/Entregadas) × 0.4 + (Calidad/4) × 0.2
+
+Auto-Increment Protection
+Both Performance and OTO evaluations use auto-detection (
+findNextPerformanceCollection / findNextOtoCollection) to prevent overwriting historical data by scanning existing Firestore collections.
+
 
 ## Contributing
 
