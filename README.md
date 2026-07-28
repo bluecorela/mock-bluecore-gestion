@@ -1,6 +1,6 @@
 # Mock Bluecore Gestión — Backend API
 
-API backend construida con NestJS para el portal de gestión interna de Bluecore. Gestiona equipos, personal, evaluaciones de desempeño, sesiones One to One, rotaciones y métricas de rendimiento, integrado con Firebase Firestore como base de datos.
+API backend construida con NestJS para el portal de gestión interna de Bluecore. Gestiona equipos, personal, evaluaciones de desempeño, sesiones One to One, rotaciones y métricas de rendimiento, integrado con Supabase/PostgreSQL como base de datos.
 
 ## Features
 
@@ -11,17 +11,17 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 - **One to One (OTO)**: Sesiones individuales cada 4 sprints con configuración dinámica, historial y exportación.
 - **Rotation Management**: Control de rotaciones entre equipos con historial completo.
 - **Operations Engine**: Cálculo centralizado de promedios de rendimiento, tendencias y calificaciones por sprint.
-- **Dynamic Sidebar**: Módulos de navegación controlados por rol desde Firestore.
+- **Dynamic Sidebar**: Módulos de navegación controlados por rol desde Supabase.
 - **Maintenance Mode**: Endpoint para activar/desactivar modo mantenimiento global.
-- **Firebase Integration**: Firestore como base de datos, Firebase Auth para autenticación de servicio.
-- **Auto-Increment Protection**: Detección automática de colecciones para evitar sobrescritura de datos históricos.
+- **Supabase Integration**: PostgreSQL como base de datos y Supabase Data API para acceso desde el backend.
+- **Migration Utilities**: Scripts para exportar Firestore y preparar/importar datos hacia Supabase.
 
 ## Prerequisites
 
 - Node.js (version 18 or higher)
 - npm or yarn
-- Firebase project with Firestore and Authentication enabled
-- Service account credentials or email/password for Firebase Auth
+- Supabase project with Data API enabled
+- Supabase secret/service role key for backend access
 
 ## Installation
 
@@ -37,17 +37,12 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
    ```
 
 3. Set up environment variables:
-   Create a `.env` file in the root directory and configure your Firebase credentials and other necessary variables.
+   Create a `.env` file in the root directory and configure your Supabase credentials and other necessary variables.
 
    EXAMPLE:
 ```
-   FIREBASE_API_KEY=your_api_key
-   FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   FIREBASE_PROJECT_ID=your_project_id
-   FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-   FIREBASE_APP_ID=your_app_id
-   FIREBASE_EMAIL=service_account@email.com
-   FIREBASE_PASSWORD=your_password
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your_secret_or_service_role_key
 ```
 ## Running the Application
 
@@ -121,8 +116,12 @@ src/
 ├── app.module.ts              # Root module
 ├── app.controller.ts          # Health check
 ├── app.service.ts             # Base service
+├── supabase/
+│   ├── supabase.client.ts     # Supabase client wrapper
+│   ├── supabase-data.service.ts # Data access layer
+│   └── interfaces/
 ├── firebase/
-│   └── firebase.client.ts     # Firebase Firestore client (core data layer)
+│   └── firebase.client.ts     # Legacy Firebase client kept for migration reference
 ├── equipos/
 │   ├── equipos.controller.ts  # Teams & Sprints endpoints
 │   ├── equipos.service.ts     # Dashboard, metrics & evaluation logic
@@ -170,9 +169,13 @@ The scoring formula for sprint evaluations is calculated on the frontend and sto
 
 Total Final = (Entregadas/Asignadas) × 0.4 + (Netas/Entregadas) × 0.4 + (Calidad/4) × 0.2
 
-Auto-Increment Protection
-Both Performance and OTO evaluations use auto-detection (
-findNextPerformanceCollection / findNextOtoCollection) to prevent overwriting historical data by scanning existing Firestore collections.
+Migration Scripts
+
+```bash
+npm run firebase:export
+npm run supabase:prepare
+npm run supabase:check
+```
 
 
 ## Contributing

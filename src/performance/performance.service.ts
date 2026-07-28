@@ -1,25 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
 import { CreatePerformanceEvaluacionDto } from './dto/performance-evaluacion.dto';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class PerformanceService {
-    constructor(private readonly firebaseClient: FirebaseClient) { }
+    constructor(private readonly supabaseDataService: SupabaseDataService) { }
 
     /**
-     * Lee la configuración de preguntas y respuestas desde Firestore.
-     * Colección: config_evaluaciones / Documento: performance
+     * Lee la configuración de preguntas y respuestas desde Supabase.
+     * Tabla: config_evaluaciones / id: performance
      *
-     * Las preguntas en Firestore NO llevan número (ej: "¿Cómo evalúa...?").
+     * Las preguntas en Supabase NO llevan número (ej: "¿Cómo evalúa...?").
      * El número se agrega aquí dinámicamente según el orden del array,
-     * así si cambias el orden en Firestore los números se ajustan solos.
+     * así si cambias el orden en Supabase los números se ajustan solos.
      */
     async getConfig() {
-        const config = await this.firebaseClient.getPerformanceConfig();
+        const config = await this.supabaseDataService.getPerformanceConfig();
 
         if (!config || !config.preguntas || !config.respuestas) {
             throw new NotFoundException(
-                'No se encontró configuración de evaluación en Firestore. ' +
+                'No se encontró configuración de evaluación en Supabase. ' +
                 'Ejecuta POST /performance/seed para cargar la configuración inicial.'
             );
         }
@@ -33,7 +33,7 @@ export class PerformanceService {
     }
 
     // /**
-    //  * Importa la configuración inicial de preguntas a Firestore.
+    //  * Importa la configuración inicial de preguntas a Supabase.
     //  * Solo necesita ejecutarse una vez (o cuando se quiera resetear la config).
     //  */
     async seedConfig() {
@@ -121,32 +121,32 @@ export class PerformanceService {
             ]
         };
 
-        await this.firebaseClient.savePerformanceConfig({
+        await this.supabaseDataService.savePerformanceConfig({
             preguntas,
             respuestas,
             fechaActualizacion: new Date().toISOString()
         });
 
-        return { ok: true, message: 'Configuración de performance importada a Firestore exitosamente' };
+        return { ok: true, message: 'Configuración de performance importada a Supabase exitosamente' };
     }
 
     async save(data: CreatePerformanceEvaluacionDto) {
-        return this.firebaseClient.savePerformanceEvaluacion(data);
+        return this.supabaseDataService.savePerformanceEvaluacion(data);
     }
 
     async getHistorial(equipoId: string) {
-        return this.firebaseClient.getPerformanceHistorial(equipoId);
+        return this.supabaseDataService.getPerformanceHistorial(equipoId);
     }
 
     async habilitarEvaluacion(equipoId: string, nombreAdmin: string) {
-        return this.firebaseClient.habilitarPerformance(equipoId, nombreAdmin);
+        return this.supabaseDataService.habilitarPerformance(equipoId, nombreAdmin);
     }
 
     async getHabilitaciones(equipoId?: string) {
-        return this.firebaseClient.getHabilitacionesPerformance(equipoId);
+        return this.supabaseDataService.getHabilitacionesPerformance(equipoId);
     }
 
     async getHabilitacionActiva(equipoId: string) {
-        return this.firebaseClient.getHabilitacionActiva(equipoId);
+        return this.supabaseDataService.getHabilitacionActiva(equipoId);
     }
 }

@@ -17,7 +17,7 @@ export class PerformanceController {
     }
 
     @Post('seed')
-    @ApiOperation({ summary: 'Importar configuración inicial de preguntas a Firestore' })
+    @ApiOperation({ summary: 'Importar configuración inicial de preguntas a Supabase' })
     @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
     async seedConfig() {
         return this.performanceService.seedConfig();

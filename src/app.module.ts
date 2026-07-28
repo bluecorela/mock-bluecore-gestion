@@ -11,6 +11,8 @@ import { RotacionModule } from './rotacion/rotacion.module';
 import { OtoModule } from './oto/oto.module';
 import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { SupabaseModule } from './supabase/supabase.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -26,6 +28,8 @@ import { MaintenanceModule } from './maintenance/maintenance.module';
     OtoModule,
     PerformanceModule,
     MaintenanceModule,
+    SupabaseModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -16,7 +16,7 @@ export class EquiposController {
   async create(@Body() createEquipoDto: CreateEquipoDto) {
     try {
       return await this.equiposService.create(createEquipoDto);
-    } catch (error) {
+    } catch (error: any) {
       if (error.message === 'Ya existe un equipo con ese nombre') {
         throw new ConflictException(error.message);
       }

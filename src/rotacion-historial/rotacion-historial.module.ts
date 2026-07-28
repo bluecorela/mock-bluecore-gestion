@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { RotacionHistorialService } from './rotacion-historial.service';
 import { RotacionHistorialController } from './rotacion-historial.controller';
-import { FirebaseClientModule } from '../firebase/firebase-client.module';
+import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
-  imports: [FirebaseClientModule],
+  imports: [SupabaseModule],
   providers: [RotacionHistorialService],
   controllers: [RotacionHistorialController],
 })

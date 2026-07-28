@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { OtoService } from './oto.service';
 import { OtoController } from './oto.controller';
-import { FirebaseClientModule } from '../firebase/firebase-client.module';
+import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
-    imports: [FirebaseClientModule],
+    imports: [SupabaseModule],
     controllers: [OtoController],
     providers: [OtoService],
 })

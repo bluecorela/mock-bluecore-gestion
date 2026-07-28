@@ -1,22 +1,22 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
 import { CreateOtoEvaluacionDto } from './dto/create-oto-evaluacion.dto';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class OtoService {
-    constructor(private readonly firebaseClient: FirebaseClient) { }
+    constructor(private readonly supabaseDataService: SupabaseDataService) { }
 
     /**
-     * Lee la configuración de secciones/preguntas desde Firestore.
-     * Colección: config_evaluaciones / Documento: one-to-one
+     * Lee la configuración de secciones/preguntas desde Supabase.
+     * Tabla: config_evaluaciones / id: one-to-one
      * Lanza NotFoundException si no existe — ejecutar POST /oto/seed primero.
      */
     async getConfig() {
-        const config = await this.firebaseClient.getOtoConfig();
+        const config = await this.supabaseDataService.getOtoConfig();
 
         if (!config || !config.secciones) {
             throw new NotFoundException(
-                'No se encontró configuración de one-to-one en Firestore. ' +
+                'No se encontró configuración de one-to-one en Supabase. ' +
                 'Ejecuta POST /oto/seed para cargar la configuración inicial.'
             );
         }
@@ -25,7 +25,7 @@ export class OtoService {
     }
 
     /**
-     * Importa la configuración inicial de preguntas a Firestore.
+     * Importa la configuración inicial de preguntas a Supabase.
      * Solo necesita ejecutarse una vez.
      */
     async seedConfig() {
@@ -109,19 +109,19 @@ export class OtoService {
             },
         ];
 
-        await this.firebaseClient.saveOtoConfig({
+        await this.supabaseDataService.saveOtoConfig({
             secciones,
             fechaActualizacion: new Date().toISOString(),
         });
 
-        return { ok: true, message: 'Configuración de one-to-one importada a Firestore exitosamente' };
+        return { ok: true, message: 'Configuración de one-to-one importada a Supabase exitosamente' };
     }
 
     async save(data: CreateOtoEvaluacionDto) {
-        return this.firebaseClient.saveOtoEvaluacion(data);
+        return this.supabaseDataService.saveOtoEvaluacion(data);
     }
 
     async getHistorial(equipoId: string) {
-        return this.firebaseClient.getOtoHistorial(equipoId);
+        return this.supabaseDataService.getOtoHistorial(equipoId);
     }
 }

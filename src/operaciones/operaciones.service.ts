@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
+import {
+    DashboardSprint,
+    HistorialRotacion,
+    IngenieroActual,
+    RendimientoResumen,
+    TendenciaRendimiento,
+} from '../supabase/interfaces/supabase-interface';
 
 @Injectable()
 export class OperacionesService {
 
     calcularRendimientoUltimoSprintCerrado(
-        sprints: any[],
-        historialData: any[],
-        ingenierosActuales: any[]
-    ) {
+        sprints: DashboardSprint[],
+        historialData: HistorialRotacion[],
+        ingenierosActuales: IngenieroActual[]
+    ): RendimientoResumen | null {
         if (!sprints?.length) return null;
 
         const ordenados = [...sprints].sort((a, b) => {
@@ -26,16 +33,16 @@ export class OperacionesService {
 
         const integrantes = sprintCerrado.integrantes ?? [];
 
-        const evaluados = integrantes.filter((data: any) => {
+        const evaluados = integrantes.filter((data) => {
             if (data.calificacion === 'Arquitecto') return false;
 
             const persona = ingenierosActuales.find(p => p.nombre === data.nombre);
-            console.log('persona encontrada:', persona);
             if (!persona) return false;
 
             if (persona.inicioReemplazoSprintId) {
                 const fechaIngreso = this.obtenerFechaIngresoDeHistorial(historialData, persona.id);
-                if (fechaIngreso && sprintCerrado.sprint_cerrado && fechaIngreso > sprintCerrado.sprint_cerrado) {
+                const fechaCierreSprint = this.toDate(sprintCerrado.sprint_cerrado);
+                if (fechaIngreso && fechaCierreSprint && fechaIngreso > fechaCierreSprint) {
                     return false;
                 }
             }
@@ -45,7 +52,7 @@ export class OperacionesService {
 
         const promedio =
             evaluados.reduce(
-                (acc: number, i: any) => acc + (i.total_final || 0),
+                (acc: number, i) => acc + (i.total_final || 0),
                 0
             ) / (evaluados.length || 1);
 
@@ -63,7 +70,7 @@ export class OperacionesService {
     }
 
     private obtenerFechaIngresoDeHistorial(
-        historialData: any[],
+        historialData: HistorialRotacion[],
         personaId: string
     ): Date | null {
         const historial = historialData.find(
@@ -76,6 +83,12 @@ export class OperacionesService {
         return historial?.fecha ? new Date(historial.fecha) : null;
     }
 
+    private toDate(value: boolean | string | Date | null): Date | null {
+        if (!value || typeof value === 'boolean') return null;
+
+        return value instanceof Date ? value : new Date(value);
+    }
+
     private calificar(promedio: number): string {
         if (promedio >= 90) return '🌟 Rendimiento excelente';
         if (promedio >= 75) return '👍 Buen rendimiento';
@@ -84,10 +97,10 @@ export class OperacionesService {
     }
 
     calcularRendimientoSprints(
-        sprints: any[],
-        historialData: any[],
-        ingenierosActuales: any[]
-    ) {
+        sprints: DashboardSprint[],
+        historialData: HistorialRotacion[],
+        ingenierosActuales: IngenieroActual[]
+    ): TendenciaRendimiento | null {
         if (!sprints?.length) return null;
 
         const ordenados = [...sprints].sort(
@@ -102,7 +115,7 @@ export class OperacionesService {
         const valores: number[] = [];
         for (const sprint of ultimos) {
             const integrantes = sprint.integrantes ?? [];
-            const evaluados = integrantes.filter((data: any) => {
+            const evaluados = integrantes.filter((data) => {
                 if (data.calificacion === 'Arquitecto') return false;
 
                 const persona = ingenierosActuales.find(p => p.nombre === data.nombre);
@@ -110,7 +123,8 @@ export class OperacionesService {
 
                 if (persona.inicioReemplazoSprintId) {
                     const fechaIngreso = this.obtenerFechaIngresoDeHistorial(historialData, persona.id);
-                    if (fechaIngreso && sprint.sprint_cerrado && fechaIngreso > sprint.sprint_cerrado) {
+                    const fechaCierreSprint = this.toDate(sprint.sprint_cerrado);
+                    if (fechaIngreso && fechaCierreSprint && fechaIngreso > fechaCierreSprint) {
                         return false;
                     }
                 }
@@ -119,7 +133,7 @@ export class OperacionesService {
             });
 
             const promedio = evaluados.reduce(
-                (acc: number, i: any) => acc + (i.total_final || 0),
+                (acc: number, i) => acc + (i.total_final || 0),
                 0
             ) / (evaluados.length || 1);
 
@@ -137,4 +151,3 @@ export class OperacionesService {
 
 
 }
-

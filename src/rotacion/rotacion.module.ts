@@ -1,10 +1,11 @@
 import { Module } from '@nestjs/common';
 import { RotacionController } from './rotacion.controller';
 import { RotacionService } from './rotacion.service';
-import { FirebaseClient } from '../firebase/firebase.client';
+import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
+    imports: [SupabaseModule],
     controllers: [RotacionController],
-    providers: [RotacionService, FirebaseClient],
+    providers: [RotacionService],
 })
 export class RotacionModule { }

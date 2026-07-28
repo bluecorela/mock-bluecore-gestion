@@ -1,42 +1,66 @@
-import { Injectable } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateEquipoDto } from './dto/create-equipo.dto';
 import { OperacionesService } from '../operaciones/operaciones.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
+import {
+  BarChartData,
+  Equipo,
+  DashboardIntegrante,
+  DashboardSprint,
+  EquipoDashboardData,
+  EquipoSprintResponse,
+  GuardarEvaluacionRequest,
+  HistorialRotacion,
+  IngenieroActual,
+  ResumenIntegrante,
+  Sprint,
+  SprintEstado,
+} from '../supabase/interfaces/supabase-interface';
 
 @Injectable()
 export class EquiposService {
   constructor(
-    private readonly firebaseClient: FirebaseClient,
     private readonly operacionesService: OperacionesService,
+    private readonly supabaseDataService: SupabaseDataService,
   ) { }
 
-  async getDashboardData(equipoId: string) {
-    const equipo = await this.firebaseClient.getEquipo(equipoId);
+  async getDashboardData(equipoId: string): Promise<EquipoDashboardData | null> {
+    const equipo = await this.supabaseDataService.getEquipo(equipoId);
     if (!equipo) return null;
 
-    const personal = await this.firebaseClient.getPersonalByEquipo(equipoId);
+    const personal = await this.supabaseDataService.getPersonalByEquipo(equipoId);
     const rolesPermitidos = ['Ingeniero de Software', 'Ingeniero de QA', 'Ingeniero QA'];
-    const ingenierosActuales = (personal as any[])
-      .filter(p => rolesPermitidos.some(rol => p.rol?.toLowerCase().includes(rol.toLowerCase())))
-      .map(p => ({
+    const ingenierosActuales: IngenieroActual[] = personal
+      .filter((p) => rolesPermitidos.some((rol) => p.rol?.toLowerCase().includes(rol.toLowerCase())))
+      .map((p) => ({
         id: p.id,
-        nombre: p.nombre,
-        inicioReemplazoSprintId: p.inicioReemplazoSprintId || null,
+        nombre: p.nombre ?? '',
+        inicioReemplazoSprintId: p.inicio_reemplazo_sprint_id || null,
         vacaciones: p.vacaciones ?? null,
       }));
 
-    const historialData = await this.firebaseClient.getHistorialRotaciones();
-    const rawSprints = await this.firebaseClient.getSprintsByEquipo(equipoId);
+    const historialData = await this.supabaseDataService.getHistorialRotaciones() as HistorialRotacion[];
+    const rawSprints = await this.supabaseDataService.getSprintsByEquipo(equipoId);
 
     // Mapear sprints al formato que espera OperacionesService y el Dashboard
-    const sprints = await Promise.all((rawSprints as any[]).map(async (s) => {
-      const integrantes = await this.firebaseClient.getIntegrantesBySprint(equipoId, s.id);
+    const sprints: DashboardSprint[] = await Promise.all(rawSprints.map(async (s) => {
+      const integrantes = await this.supabaseDataService.getIntegrantesBySprint(equipoId, s.firebase_id);
       return {
-        id: s.id,
-        fechaInicio: s.fecha_inicio?.toDate?.() ?? s.fecha_inicio ?? null,
-        fechaFin: s.fecha_fin?.toDate?.() ?? s.fecha_fin ?? null,
-        sprintsCerrado: s.sprint_cerrado === true ? true : (s.sprint_cerrado?.toDate?.() ?? s.sprint_cerrado ?? null),
-        integrantes: integrantes
+        id: s.firebase_id,
+        fechaInicio: s.fecha_inicio ?? null,
+        fechaFin: s.fecha_fin ?? null,
+        sprint_cerrado: s.sprint_cerrado ?? null,
+        sprintsCerrado: s.sprint_cerrado ?? null,
+        integrantes: integrantes.map((integrante): DashboardIntegrante => ({
+          id: integrante.id,
+          nombre: integrante.nombre ?? '',
+          total1: integrante.total1,
+          total2: integrante.total2,
+          total3: integrante.total3,
+          total_final: integrante.total_final,
+          calificacion: integrante.calificacion,
+          comentarios: integrante.comentarios,
+        })),
       };
     }));
 
@@ -50,21 +74,21 @@ export class EquiposService {
     // Calcular estado de cada sprint (Completado/En proceso)
     // Lógica espejo del frontend
     const dashboardSprints = ordenados.map((s, index) => {
-      let estado: 'Completado' | 'En proceso' = 'En proceso';
+      let estado: SprintEstado = 'En proceso';
       if (index > 0) {
         estado = 'Completado';
       } else {
         // Para el más reciente, verificamos si todos los ingenieros esperados fueron evaluados
-        const evaluados = s.integrantes.filter((i: any) => {
+        const evaluados = s.integrantes.filter((i) => {
           if (i.calificacion === 'Arquitecto') return false;
-          const persona = ingenierosActuales.find((p: any) => p.nombre === i.nombre);
+          const persona = ingenierosActuales.find((p) => p.nombre === i.nombre);
           if (!persona) return false;
           // Lógica simplificada de vacaciones para el dashboard resumido
           if (persona.vacaciones) return false;
           return true;
         });
 
-        const ingenierosValidos = ingenierosActuales.filter((p: any) => !p.vacaciones);
+        const ingenierosValidos = ingenierosActuales.filter((p) => !p.vacaciones);
         estado = (evaluados.length >= ingenierosValidos.length && ingenierosValidos.length > 0) ? 'Completado' : 'En proceso';
       }
 
@@ -89,20 +113,20 @@ export class EquiposService {
     );
 
     // Gráfico de barras del último sprint completado
-    let barChartData: { labels: string[], datasets: { data: number[] }[] } = {
+    let barChartData: BarChartData = {
       labels: [],
       datasets: [{ data: [] }]
     };
-    let sprintGraficoId = null;
+    let sprintGraficoId: string | null = null;
 
     for (const s of ordenados) {
-      const evaluados = (s.integrantes as any[]).filter((i: any) => i.calificacion !== 'Arquitecto');
+      const evaluados = s.integrantes.filter((i) => i.calificacion !== 'Arquitecto');
       // Si el sprint está cerrado o tiene evaluaciones, lo usamos para la gráfica de barras
       if (evaluados.length > 0) {
         barChartData = {
-          labels: evaluados.map((i: any) => i.nombre),
+          labels: evaluados.map((i) => i.nombre),
           datasets: [{
-            data: evaluados.map((i: any) => i.total_final)
+            data: evaluados.map((i) => i.total_final ?? 0)
           }]
         };
         sprintGraficoId = s.id;
@@ -112,8 +136,8 @@ export class EquiposService {
 
     return {
       equipo: {
-        id: (equipo as any).id,
-        nombre: (equipo as any).nombre,
+        id: equipo.id,
+        nombre: equipo.nombre,
       },
       stats: {
         totalMiembros: ingenierosActuales.length,
@@ -130,44 +154,77 @@ export class EquiposService {
     };
   }
 
-  async findAll(onlyWithEvaluations = false) {
-    return this.firebaseClient.getEquipos(onlyWithEvaluations);
+  async findAll(onlyWithEvaluations = false): Promise<Equipo[]> {
+    return this.supabaseDataService.getEquipos(onlyWithEvaluations);
   }
 
-  async getSprintsByEquipo(equipoId: string) {
-    const sprints = await this.firebaseClient.getSprintsByEquipo(equipoId);
-    return sprints.map((s: any) => ({
-      id: s.id,
-      nombre: s.id,
-      fechaInicio: s.fecha_inicio?.toDate?.() ?? null,
-      fechaFin: s.fecha_fin?.toDate?.() ?? null,
+  async getSprintsByEquipo(equipoId: string): Promise<EquipoSprintResponse[]> {
+    const sprints = await this.supabaseDataService.getSprintsByEquipo(equipoId);
+    return sprints.map((s) => ({
+      id: s.firebase_id,
+      nombre: s.firebase_id,
+      fechaInicio: s.fecha_inicio ?? null,
+      fechaFin: s.fecha_fin ?? null,
       sprintCerrado: s.sprint_cerrado ?? null,
     }));
   }
-  async getIntegrantesBySprint(equipoId: string, sprintId: string) {
-    return this.firebaseClient.getIntegrantesBySprint(equipoId, sprintId);
-  }
-  async getSprint(equipoId: string, sprintId: string) {
-    return this.firebaseClient.getSprint(equipoId, sprintId);
+  async getIntegrantesBySprint(equipoId: string, sprintId: string): Promise<ResumenIntegrante[]> {
+    return this.supabaseDataService.getIntegrantesBySprintLegacy(equipoId, sprintId);
   }
 
-  async getEquipo(equipoId: string) {
-    return this.firebaseClient.getEquipo(equipoId);
+  async getSprint(equipoId: string, sprintId: string) {
+    const sprint = await this.supabaseDataService.getSprint(equipoId, sprintId);
+
+    if (!sprint) return null;
+
+    return {
+      id: sprint.firebase_id,
+      fecha_inicio: sprint.fecha_inicio,
+      fecha_fin: sprint.fecha_fin,
+      sprintCerrado: sprint.sprint_cerrado ?? null,
+    };
+  }
+
+  async getEquipo(equipoId: string): Promise<Equipo | null> {
+    return this.supabaseDataService.getEquipo(equipoId);
   }
 
   async getMetricas(equipoId: string, sprintId: string) {
-    return this.firebaseClient.obtenerMetricas(equipoId, sprintId);
+    return this.supabaseDataService.obtenerMetricas(equipoId, sprintId);
   }
 
   async create(createEquipoDto: CreateEquipoDto) {
-    return this.firebaseClient.createEquipo(createEquipoDto.nombre);
+    return this.supabaseDataService.createEquipo(createEquipoDto.nombre);
   }
 
   async getSprintEvaluationStatus(equipoId: string, sprintId?: string) {
-    return this.firebaseClient.getSprintEvaluationStatus(equipoId, sprintId);
+    return this.supabaseDataService.getSprintEvaluationStatus(equipoId, sprintId);
   }
 
-  async guardarEvaluacion(data: any) {
-    return this.firebaseClient.guardarEvaluacion(data);
+  async guardarEvaluacion(data: Partial<GuardarEvaluacionRequest> | undefined) {
+    if (!data || typeof data !== 'object') {
+      throw new BadRequestException('El cuerpo de la evaluación es obligatorio');
+    }
+
+    const requiredFields: Array<keyof GuardarEvaluacionRequest> = [
+      'equipoId',
+      'sprintId',
+      'fechaInicio',
+      'fechaFin',
+      'ingeniero',
+      'metricas',
+      'puntuacionFinal',
+      'calificacionTexto',
+      'evaluadorCorreo',
+    ];
+    const missingFields = requiredFields.filter((field) => data[field] === undefined || data[field] === null);
+
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `Faltan campos obligatorios para guardar la evaluación: ${missingFields.join(', ')}`,
+      );
+    }
+
+    return this.supabaseDataService.guardarEvaluacion(data as GuardarEvaluacionRequest);
   }
 }

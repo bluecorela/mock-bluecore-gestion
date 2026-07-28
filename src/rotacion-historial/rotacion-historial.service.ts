@@ -1,20 +1,16 @@
 import { Injectable } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class RotacionHistorialService {
-  constructor(private readonly firebaseClient: FirebaseClient) { }
+  constructor(private readonly supabaseDataService: SupabaseDataService) { }
 
   async findAll() {
-    const historial = await this.firebaseClient.getHistorialRotaciones();
+    const historial = await this.supabaseDataService.getHistorialRotaciones();
 
-    return historial.map((item: any) => ({
+    return historial.map((item) => ({
       ...item,
-      fecha: item.fecha?.toDate
-        ? item.fecha.toDate()
-        : item.fecha?.seconds
-          ? new Date(item.fecha.seconds * 1000)
-          : null,
+      fecha: item.fecha ? new Date(item.fecha) : null,
     }));
   }
 }

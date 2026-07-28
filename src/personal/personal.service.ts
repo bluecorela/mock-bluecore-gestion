@@ -1,25 +1,25 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
 import { CreatePersonalDto } from './dto/create-personal.dto';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class PersonalService {
-  constructor(private readonly firebaseClient: FirebaseClient) { }
+  constructor(private readonly supabaseDataService: SupabaseDataService) { }
 
   async findOne(correo: string) {
-    return this.firebaseClient.getPersonalByEmail(decodeURIComponent(correo));
+    return this.supabaseDataService.getPersonalByEmail(decodeURIComponent(correo));
   }
 
   async findEquipo(equipoId: string) {
-    return await this.firebaseClient.getPersonalByEquipo(equipoId);
+    return await this.supabaseDataService.getPersonalByEquipo(equipoId);
   }
 
   async getVacaciones() {
-    return await this.firebaseClient.getPersonalOnVacation();
+    return await this.supabaseDataService.getPersonalOnVacation();
   }
 
   async findAll() {
-    return this.firebaseClient.getPersonal();
+    return this.supabaseDataService.getPersonal();
   }
 
   async create(createPersonalDto: CreatePersonalDto) {
@@ -38,7 +38,7 @@ export class PersonalService {
       throw new BadRequestException(`El rol ${rol} requiere equipo`);
     }
 
-    return this.firebaseClient.createPersonal({ nombre, rol, correo, equipoId });
+    return this.supabaseDataService.createPersonal({ nombre, rol, correo, equipoId });
   }
 
 }

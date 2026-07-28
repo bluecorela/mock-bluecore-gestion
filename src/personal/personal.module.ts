@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PersonalService } from './personal.service';
 import { PersonalController } from './personal.controller';
-import { FirebaseClientModule } from '../firebase/firebase-client.module';
+import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
-  imports: [FirebaseClientModule],
+  imports: [SupabaseModule],
   controllers: [PersonalController],
   providers: [PersonalService],
 })

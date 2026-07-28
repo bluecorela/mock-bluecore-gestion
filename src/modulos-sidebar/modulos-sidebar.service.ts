@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { FirebaseClient } from '../firebase/firebase.client';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class ModulosSidebarService {
-constructor(private readonly firebaseClient: FirebaseClient) { }
+constructor(private readonly supabaseDataService: SupabaseDataService) { }
 
   async getModulosRol(rol: string) {
-    return this.firebaseClient.getModulosRol(rol);
+    return this.supabaseDataService.getModulosRol(rol);
   }
 
 }
