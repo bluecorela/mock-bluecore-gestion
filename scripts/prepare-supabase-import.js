@@ -23,8 +23,8 @@ const importDir = path.resolve(process.env.SUPABASE_IMPORT_DIR || 'supabase-impo
 const tablesDir = path.join(importDir, 'tables');
 
 const tables = {
-  equipos: [],
-  personal: [],
+  teams: [],
+  personnel: [],
   sprints: [],
   sprint_integrantes: [],
   performance_evaluaciones: [],
@@ -85,11 +85,11 @@ async function readExportFile(name, fallback = []) {
   }
 }
 
-function getEquipoIdFromReference(data) {
-  if (!data.equipo) return null;
+function getTeamIdFromReference(data) {
+  if (!data.team) return null;
 
-  if (typeof data.equipo === 'string') {
-    return data.equipo.split('/').at(-1);
+  if (typeof data.team === 'string') {
+    return data.team.split('/').at(-1);
   }
 
   return null;
@@ -100,28 +100,28 @@ function parseEvaluationNumber(collectionId, fallback) {
   return match ? Number(match[1]) : fallback || null;
 }
 
-function addEquipos(equipos) {
-  for (const equipo of equipos) {
-    const data = readData(equipo);
+function addTeams(teams) {
+  for (const team of teams) {
+    const data = readData(team);
 
-    tables.equipos.push({
-      id: equipo.id,
-      nombre: emptyToNull(data.nombre),
-      firebase_path: equipo.path,
+    tables.teams.push({
+      id: team.id,
+      name: emptyToNull(data.name),
+      firebase_path: team.path,
       raw_data: data,
     });
   }
 }
 
-function addSprintsAndIntegrantes(equipos) {
-  for (const equipo of equipos) {
-    for (const sprint of equipo.subcollections?.sprints || []) {
+function addSprintsAndMembers(teams) {
+  for (const team of teams) {
+    for (const sprint of team.subcollections?.sprints || []) {
       const data = readData(sprint);
 
       tables.sprints.push({
-        id: `${equipo.id}__${sprint.id}`,
+        id: `${team.id}__${sprint.id}`,
         firebase_id: sprint.id,
-        equipo_id: equipo.id,
+        equipo_id: team.id,
         fecha_inicio: emptyToNull(data.fecha_inicio),
         fecha_fin: emptyToNull(data.fecha_fin),
         sprint_cerrado: emptyToNull(data.sprint_cerrado),
@@ -129,55 +129,55 @@ function addSprintsAndIntegrantes(equipos) {
         raw_data: data,
       });
 
-      for (const integrante of sprint.subcollections?.Integrantes || []) {
-        const integranteData = readData(integrante);
+      for (const member of sprint.subcollections?.Integrantes || []) {
+        const memberData = readData(member);
 
         tables.sprint_integrantes.push({
-          id: `${equipo.id}__${sprint.id}__${integrante.id}`,
-          firebase_id: integrante.id,
-          sprint_id: `${equipo.id}__${sprint.id}`,
-          equipo_id: equipo.id,
-          nombre: emptyToNull(integranteData.nombre),
-          tareas_asignadas: emptyToNull(integranteData.tareasAsignadas),
+          id: `${team.id}__${sprint.id}__${member.id}`,
+          firebase_id: member.id,
+          sprint_id: `${team.id}__${sprint.id}`,
+          equipo_id: team.id,
+          name: emptyToNull(memberData.name),
+          tareas_asignadas: emptyToNull(memberData.assignedTasks),
           tareas_entregadas: emptyToNull(
-            integranteData.tareasEntregadas ?? integranteData.tareasEntregadas2,
+            memberData.deliveredTasks ?? memberData.deliveredTasksAlternative,
           ),
-          tareas_devueltas: emptyToNull(integranteData.tareasDevueltas),
-          calidad_codigo: emptyToNull(integranteData.calidadCodigo),
-          total1: emptyToNull(integranteData.total1),
-          total2: emptyToNull(integranteData.total2),
-          total3: emptyToNull(integranteData.total3),
-          total_final: emptyToNull(integranteData.total_final),
-          calificacion: emptyToNull(integranteData.calificacion),
-          comentarios: emptyToNull(integranteData.comentarios),
-          evaluado_por: emptyToNull(integranteData.evaluado_por),
-          fecha_evaluacion: emptyToNull(integranteData.fecha_evaluacion),
-          firebase_path: integrante.path,
-          raw_data: integranteData,
+          tareas_devueltas: emptyToNull(memberData.returnedTasks),
+          calidad_codigo: emptyToNull(memberData.codeQuality),
+          total1: emptyToNull(memberData.total1),
+          total2: emptyToNull(memberData.total2),
+          total3: emptyToNull(memberData.total3),
+          total_final: emptyToNull(memberData.total_final),
+          rating: emptyToNull(memberData.rating),
+          comments: emptyToNull(memberData.comments),
+          evaluado_por: emptyToNull(memberData.evaluado_por),
+          fecha_evaluacion: emptyToNull(memberData.fecha_evaluacion),
+          firebase_path: member.path,
+          raw_data: memberData,
         });
       }
     }
   }
 }
 
-function addEvaluaciones(equipos) {
-  for (const equipo of equipos) {
-    for (const evaluacionRoot of equipo.subcollections?.evaluaciones || []) {
-      for (const collections of Object.values(evaluacionRoot.subcollections || {})) {
+function addEvaluations(teams) {
+  for (const team of teams) {
+    for (const evaluationRoot of team.subcollections?.evaluations || []) {
+      for (const collections of Object.values(evaluationRoot.subcollections || {})) {
         for (const collection of collections) {
           const collectionNumber = parseEvaluationNumber(collection.id);
 
           for (const evaluation of collection.docs || []) {
             const data = readData(evaluation);
             const baseRow = {
-              id: `${equipo.id}__${collection.id}__${evaluation.id}`,
+              id: `${team.id}__${collection.id}__${evaluation.id}`,
               firebase_id: evaluation.id,
-              equipo_id: emptyToNull(data.equipoId || equipo.id),
-              nombre_ingeniero: emptyToNull(data.nombreIngeniero),
-              nombre_evaluador: emptyToNull(data.nombreEvaluador),
-              periodo: emptyToNull(data.periodo),
-              numero_evaluacion: emptyToNull(data.numeroEvaluacion || collectionNumber),
-              fecha: emptyToNull(data.fecha),
+              equipo_id: emptyToNull(data.teamId || team.id),
+              nombre_ingeniero: emptyToNull(data.engineerName),
+              nombre_evaluador: emptyToNull(data.evaluatorName),
+              period: emptyToNull(data.period),
+              numero_evaluacion: emptyToNull(data.evaluationNumber || collectionNumber),
+              date: emptyToNull(data.date),
               firebase_collection: collection.id,
               firebase_path: evaluation.path,
               raw_data: data,
@@ -186,21 +186,21 @@ function addEvaluaciones(equipos) {
             if (collection.path.includes('/perfomance/')) {
               tables.performance_evaluaciones.push({
                 ...baseRow,
-                respuestas: emptyToNull(data.respuestas),
-                logros: emptyToNull(data.logros),
-                potencial_crecimiento: emptyToNull(data.potencialCrecimiento),
-                observaciones_adicionales: emptyToNull(data.observacionesAdicionales),
-                retroalimentacion_confirmada: emptyToNull(data.retroalimentacionConfirmada),
+                answers: emptyToNull(data.answers),
+                achievements: emptyToNull(data.achievements),
+                potencial_crecimiento: emptyToNull(data.growthPotential),
+                observaciones_adicionales: emptyToNull(data.additionalObservations),
+                retroalimentacion_confirmada: emptyToNull(data.feedbackConfirmed),
               });
             }
 
             if (collection.path.includes('/one-to-one/')) {
               tables.oto_evaluaciones.push({
                 ...baseRow,
-                resumen: emptyToNull(data.resumen),
-                sintesis_final: emptyToNull(data.sintesisFinal),
-                preguntas_reflexion: emptyToNull(data.preguntasReflexion),
-                habilidades_blandas: emptyToNull(data.habilidadesBlandas),
+                summary: emptyToNull(data.summary),
+                sintesis_final: emptyToNull(data.finalSummary),
+                preguntas_reflexion: emptyToNull(data.reflectionQuestions),
+                habilidades_blandas: emptyToNull(data.softSkills),
               });
             }
           }
@@ -210,63 +210,63 @@ function addEvaluaciones(equipos) {
   }
 }
 
-function addPersonal(personal) {
-  for (const person of personal) {
+function addPersonnel(personnel) {
+  for (const person of personnel) {
     const data = readData(person);
 
-    tables.personal.push({
+    tables.personnel.push({
       id: person.id,
-      nombre: emptyToNull(data.nombre),
-      rol: emptyToNull(data.rol),
-      correo: emptyToNull(data.correo),
-      equipo_id: emptyToNull(getEquipoIdFromReference(data)),
-      vacaciones: emptyToNull(data.vacaciones),
-      inicio_reemplazo_sprint_id: emptyToNull(data.inicioReemplazoSprintId),
+      name: emptyToNull(data.name),
+      role: emptyToNull(data.role),
+      email: emptyToNull(data.email),
+      equipo_id: emptyToNull(getTeamIdFromReference(data)),
+      onVacation: emptyToNull(data.onVacation),
+      inicio_reemplazo_sprint_id: emptyToNull(data.replacementStartSprintId),
       firebase_path: person.path,
       raw_data: data,
     });
   }
 }
 
-function addHistorialRotaciones(rotaciones) {
-  for (const rotacion of rotaciones) {
-    const data = readData(rotacion);
+function addRotationHistoryRecords(rotations) {
+  for (const rotation of rotations) {
+    const data = readData(rotation);
 
     tables.historial_rotaciones.push({
-      id: rotacion.id,
-      fecha: emptyToNull(data.fecha),
+      id: rotation.id,
+      date: emptyToNull(data.date),
       tipo: emptyToNull(data.tipo),
-      nombre: emptyToNull(data.nombre),
-      personal_id: emptyToNull(data.personalId),
+      name: emptyToNull(data.name),
+      personal_id: emptyToNull(data.personnelId),
       desde: emptyToNull(data.desde),
-      desde_nombre: emptyToNull(data.desdeNombre),
+      desde_nombre: emptyToNull(data.sourceName),
       hacia: emptyToNull(data.hacia),
-      hacia_nombre: emptyToNull(data.haciaNombre),
-      firebase_path: rotacion.path,
+      hacia_nombre: emptyToNull(data.destinationName),
+      firebase_path: rotation.path,
       raw_data: data,
     });
   }
 }
 
-function addModulosSidebar(modulos) {
-  for (const modulo of modulos) {
-    const data = readData(modulo);
+function addSidebarModules(modules) {
+  for (const moduleItem of modules) {
+    const data = readData(moduleItem);
 
     tables.modulos_sidebar.push({
-      id: modulo.id,
-      nombre: emptyToNull(data.nombre),
+      id: moduleItem.id,
+      name: emptyToNull(data.name),
       ruta: emptyToNull(data.ruta),
       icon: emptyToNull(data.icon),
       orden: emptyToNull(data.order),
       visible: emptyToNull(data.visible),
-      roles_permitidos: emptyToNull(data.rolesPermitidos),
-      firebase_path: modulo.path,
+      roles_permitidos: emptyToNull(data.allowedRoles),
+      firebase_path: moduleItem.path,
       raw_data: data,
     });
   }
 }
 
-function addConfigEvaluaciones(configs) {
+function addEvaluationConfigs(configs) {
   for (const config of configs) {
     const data = readData(config);
 
@@ -279,21 +279,21 @@ function addConfigEvaluaciones(configs) {
   }
 }
 
-function addHabilitaciones(habilitaciones) {
-  for (const habilitacion of habilitaciones) {
-    const data = readData(habilitacion);
+function addEnablements(enablements) {
+  for (const enablement of enablements) {
+    const data = readData(enablement);
 
     tables.habilitaciones_desempeno.push({
-      id: habilitacion.id,
-      equipo_id: emptyToNull(data.equipoId),
-      nombre_equipo: emptyToNull(data.nombreEquipo),
-      nombre_admin: emptyToNull(data.nombreAdmin),
-      estado: emptyToNull(data.estado),
+      id: enablement.id,
+      equipo_id: emptyToNull(data.teamId),
+      nombre_equipo: emptyToNull(data.teamName),
+      nombre_admin: emptyToNull(data.adminName),
+      status: emptyToNull(data.status),
       evaluados_count: emptyToNull(data.evaluadosCount),
-      total_esperados: emptyToNull(data.totalEsperados),
-      fecha_habilitacion: emptyToNull(data.fechaHabilitacion),
+      total_esperados: emptyToNull(data.totalExpected),
+      fecha_habilitacion: emptyToNull(data.enabledAt),
       ultima_actualizacion: emptyToNull(data.ultimaActualizacion),
-      firebase_path: habilitacion.path,
+      firebase_path: enablement.path,
       raw_data: data,
     });
   }
@@ -334,20 +334,20 @@ function toCsv(rows) {
 }
 
 function schemaSql() {
-  return `create table if not exists equipos (
+  return `create table if not exists teams (
   id text primary key,
-  nombre text not null,
+  name text not null,
   firebase_path text,
   raw_data jsonb not null default '{}'::jsonb
 );
 
-create table if not exists personal (
+create table if not exists personnel (
   id text primary key,
-  nombre text,
-  rol text,
-  correo text,
-  equipo_id text references equipos(id),
-  vacaciones boolean,
+  name text,
+  role text,
+  email text,
+  equipo_id text references teams(id),
+  onVacation boolean,
   inicio_reemplazo_sprint_id text,
   firebase_path text,
   raw_data jsonb not null default '{}'::jsonb
@@ -356,7 +356,7 @@ create table if not exists personal (
 create table if not exists sprints (
   id text primary key,
   firebase_id text not null,
-  equipo_id text not null references equipos(id) on delete cascade,
+  equipo_id text not null references teams(id) on delete cascade,
   fecha_inicio timestamptz,
   fecha_fin timestamptz,
   sprint_cerrado boolean,
@@ -368,8 +368,8 @@ create table if not exists sprint_integrantes (
   id text primary key,
   firebase_id text not null,
   sprint_id text not null references sprints(id) on delete cascade,
-  equipo_id text not null references equipos(id) on delete cascade,
-  nombre text,
+  equipo_id text not null references teams(id) on delete cascade,
+  name text,
   tareas_asignadas numeric,
   tareas_entregadas numeric,
   tareas_devueltas numeric,
@@ -378,8 +378,8 @@ create table if not exists sprint_integrantes (
   total2 numeric,
   total3 numeric,
   total_final numeric,
-  calificacion text,
-  comentarios text,
+  rating text,
+  comments text,
   evaluado_por text,
   fecha_evaluacion timestamptz,
   firebase_path text,
@@ -389,14 +389,14 @@ create table if not exists sprint_integrantes (
 create table if not exists performance_evaluaciones (
   id text primary key,
   firebase_id text not null,
-  equipo_id text references equipos(id),
+  equipo_id text references teams(id),
   nombre_ingeniero text,
   nombre_evaluador text,
-  periodo text,
+  period text,
   numero_evaluacion integer,
-  fecha timestamptz,
-  respuestas jsonb,
-  logros text,
+  date timestamptz,
+  answers jsonb,
+  achievements text,
   potencial_crecimiento text,
   observaciones_adicionales text,
   retroalimentacion_confirmada boolean,
@@ -408,13 +408,13 @@ create table if not exists performance_evaluaciones (
 create table if not exists oto_evaluaciones (
   id text primary key,
   firebase_id text not null,
-  equipo_id text references equipos(id),
+  equipo_id text references teams(id),
   nombre_ingeniero text,
   nombre_evaluador text,
-  periodo text,
+  period text,
   numero_evaluacion integer,
-  fecha timestamptz,
-  resumen jsonb,
+  date timestamptz,
+  summary jsonb,
   sintesis_final jsonb,
   preguntas_reflexion jsonb,
   habilidades_blandas jsonb,
@@ -425,9 +425,9 @@ create table if not exists oto_evaluaciones (
 
 create table if not exists historial_rotaciones (
   id text primary key,
-  fecha timestamptz,
+  date timestamptz,
   tipo text,
-  nombre text,
+  name text,
   personal_id text,
   desde text,
   desde_nombre text,
@@ -439,7 +439,7 @@ create table if not exists historial_rotaciones (
 
 create table if not exists modulos_sidebar (
   id text primary key,
-  nombre text,
+  name text,
   ruta text,
   icon text,
   orden integer,
@@ -458,10 +458,10 @@ create table if not exists config_evaluaciones (
 
 create table if not exists habilitaciones_desempeno (
   id text primary key,
-  equipo_id text references equipos(id),
+  equipo_id text references teams(id),
   nombre_equipo text,
   nombre_admin text,
-  estado text,
+  status text,
   evaluados_count integer,
   total_esperados integer,
   fecha_habilitacion timestamptz,
@@ -477,7 +477,7 @@ create table if not exists settings (
   raw_data jsonb not null default '{}'::jsonb
 );
 
-create index if not exists idx_personal_equipo_id on personal(equipo_id);
+create index if not exists idx_personal_equipo_id on personnel(equipo_id);
 create index if not exists idx_sprints_equipo_id on sprints(equipo_id);
 create index if not exists idx_sprint_integrantes_sprint_id on sprint_integrantes(sprint_id);
 create index if not exists idx_performance_equipo_id on performance_evaluaciones(equipo_id);
@@ -492,12 +492,12 @@ async function writeJson(filePath, data) {
 
 async function main() {
   const [
-    equipos,
-    personal,
-    historialRotaciones,
-    modulosSidebar,
-    configEvaluaciones,
-    habilitaciones,
+    teams,
+    personnel,
+    rotationHistoryRecords,
+    sidebarModules,
+    evaluationConfigs,
+    enablements,
     settings,
   ] = await Promise.all([
     readExportFile('equipos'),
@@ -509,14 +509,14 @@ async function main() {
     readExportFile('settings'),
   ]);
 
-  addEquipos(equipos);
-  addPersonal(personal);
-  addSprintsAndIntegrantes(equipos);
-  addEvaluaciones(equipos);
-  addHistorialRotaciones(historialRotaciones);
-  addModulosSidebar(modulosSidebar);
-  addConfigEvaluaciones(configEvaluaciones);
-  addHabilitaciones(habilitaciones);
+  addTeams(teams);
+  addPersonnel(personnel);
+  addSprintsAndMembers(teams);
+  addEvaluations(teams);
+  addRotationHistoryRecords(rotationHistoryRecords);
+  addSidebarModules(sidebarModules);
+  addEvaluationConfigs(evaluationConfigs);
+  addEnablements(enablements);
   addSettings(settings);
 
   await fs.mkdir(tablesDir, { recursive: true });

@@ -1,19 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { SupabaseClient } from './supabase.client';
 import {
-  CreatePersonalData,
-  Equipo,
-  GuardarEvaluacionRequest,
-  HistorialRotacionRow,
+  CreatePersonnelData,
+  Team,
+  SaveEvaluationRequest,
+  RotationHistoryRow,
   MaintenanceStatus,
-  ModuloSidebar,
-  Personal,
+  SidebarModule,
+  Personnel,
   Sprint,
-  SprintIntegrante,
-  UpdatePersonalData,
+  SprintMember,
+  UpdatePersonnelData,
 } from './interfaces/supabase-interface';
-import { CreatePerformanceEvaluacionDto } from '../performance/dto/performance-evaluacion.dto';
-import { CreateOtoEvaluacionDto } from '../oto/dto/create-oto-evaluacion.dto';
+import { CreatePerformanceEvaluationDto } from '../performance/dto/performance-evaluation.dto';
+import { CreateOtoEvaluationDto } from '../oto/dto/create-oto-evaluation.dto';
 
 @Injectable()
 export class SupabaseDataService {
@@ -32,8 +32,8 @@ export class SupabaseDataService {
       .replace(/\s+/g, '-');
   }
 
-  private sprintPrimaryId(equipoId: string, sprintId: string): string {
-    return `${equipoId}__${sprintId}`;
+  private sprintPrimaryId(teamId: string, sprintId: string): string {
+    return `${teamId}__${sprintId}`;
   }
 
   private getSprintNumero(sprintId: string): number {
@@ -41,70 +41,87 @@ export class SupabaseDataService {
     return parts.length > 1 ? parseInt(parts[1], 10) : 0;
   }
 
-  private mapPersonal(row: Personal | null) {
+  private mapPersonnel(row: any): Personnel | null {
     if (!row) return null;
 
     return {
-      ...row,
-      inicioReemplazoSprintId: row.inicio_reemplazo_sprint_id,
-      equipo: row.equipo_id ? { id: row.equipo_id, path: `equipos/${row.equipo_id}` } : null,
+      id: row.id,
+      name: row.full_name ?? null,
+      role: row.rol ?? null,
+      email: row.email ?? null,
+      teamId: row.team_id ?? null,
+      status: row.estatus ?? null,
+      onVacation: row.on_vacations ?? null,
+      replacementStartSprintId: row.start_sprint_replacement_id,
+      team: row.team_id ? {
+        id: row.team_id,
+        path: `teams/${row.team_id}`,
+        referencePath: `teams/${row.team_id}`,
+      } : null,
+      firebase_path: row.firebase_path,
+      raw_data: row.raw_data,
     };
   }
 
-  private mapSprintIntegrante(row: SprintIntegrante) {
+  private mapSprintMember(row: any): SprintMember {
     return {
-      id: row.firebase_id,
-      nombre: row.nombre ?? '',
+      id: row.id,
+      firebase_id: row.firebase_id,
+      sprint_id: row.sprint_id,
+      team_id: row.team_id,
+      name: row.employee_name ?? '',
       total1: row.total1 ?? 0,
       total2: row.total2 ?? 0,
       total3: row.total3 ?? 0,
       total_final: row.total_final ?? 0,
-      calificacion: row.calificacion ?? '',
-      comentarios: row.comentarios ?? undefined,
-      tareasAsignadas: row.tareas_asignadas ?? undefined,
-      tareasEntregadas: row.tareas_entregadas ?? undefined,
-      tareasDevueltas: row.tareas_devueltas ?? undefined,
-      calidadCodigo: row.calidad_codigo ?? undefined,
-      evaluado_por: row.evaluado_por ?? undefined,
-      fecha_evaluacion: row.fecha_evaluacion ?? undefined,
+      rating: row.qualification ?? '',
+      comments: row.comments ?? null,
+      assigned_tasks: row.assigned_tasks ?? null,
+      delivered_tasks: row.delivered_tasks ?? null,
+      returned_tasks: row.returned_tasks ?? null,
+      code_quality: row.code_quality ?? null,
+      evaluated_by: row.evaluated_by ?? null,
+      evaluation_date: row.evaluation_date ?? null,
+      firebase_path: row.firebase_path,
+      raw_data: row.raw_data,
     };
   }
 
-  private mapHistorial(row: HistorialRotacionRow) {
+  private mapHistory(row: RotationHistoryRow) {
     return {
       id: row.id,
-      fecha: row.fecha,
-      tipo: row.tipo,
-      nombre: row.nombre,
-      desde: row.desde,
-      desdeNombre: row.desde_nombre,
-      hacia: row.hacia,
-      haciaNombre: row.hacia_nombre,
-      personalId: row.personal_id,
+      date: row.date,
+      type: row.type,
+      name: row.employee_name,
+      fromTeam: row.from_team,
+      sourceName: row.from_name_team,
+      toTeam: row.to_team,
+      destinationName: row.to_name_team,
+      personnelId: row.employee_id,
     };
   }
 
-  async getEquipos(onlyWithEvaluations = false): Promise<Equipo[]> {
+  async getTeams(onlyWithEvaluations = false): Promise<Team[]> {
     if (onlyWithEvaluations) {
-      const { data: integrantes, error: integrantesError } = await this.client()
-        .from('sprint_integrantes')
-        .select('equipo_id');
+      const { data: members, error: membersError } = await this.client()
+        .from('sprint_members')
+        .select('team_id');
 
-      if (integrantesError) {
-        throw integrantesError;
+      if (membersError) {
+        throw membersError;
       }
 
-      const equipoIds = [...new Set((integrantes ?? []).map((integrante) => integrante.equipo_id))];
+      const teamIds = [...new Set((members ?? []).map((member) => member.team_id))];
 
-      if (!equipoIds.length) {
+      if (!teamIds.length) {
         return [];
       }
 
       const { data, error } = await this.client()
-        .from('equipos')
-        .select('id, nombre')
-        .in('id', equipoIds)
-        .order('nombre', { ascending: true });
+        .from('teams')
+        .select('id, name:name')
+        .in('id', teamIds)
+        .order('name', { ascending: true });
 
       if (error) {
         throw error;
@@ -114,10 +131,10 @@ export class SupabaseDataService {
     }
 
     const query = this.client()
-      .from('equipos')
-      .select('id, nombre');
+      .from('teams')
+      .select('id, name:name');
 
-    const { data, error } = await query.order('nombre', { ascending: true });
+    const { data, error } = await query.order('name', { ascending: true });
 
     if (error) {
       throw error;
@@ -126,86 +143,86 @@ export class SupabaseDataService {
     return data ?? [];
   }
 
-  async getEquipo(equipoId: string): Promise<Equipo | null> {
+  async getTeam(teamId: string): Promise<Team | null> {
     const { data, error } = await this.client()
-      .from('equipos')
+      .from('teams')
       .select('*')
-      .eq('id', equipoId)
+      .eq('id', teamId)
       .maybeSingle();
 
     if (error) {
       throw error;
     }
 
-    return data;
+    return data ? { ...data, name: data.name } : null;
   }
 
-  async searchTeamByName(name: string): Promise<Equipo | null> {
+  async findTeamByName(name: string): Promise<Team | null> {
     const { data, error } = await this.client()
-      .from('equipos')
+      .from('teams')
       .select('*')
-      .eq('nombre', name)
+      .eq('name', name)
       .maybeSingle();
 
     if (error) {
       throw error;
     }
 
-    return data;
+    return data ? { ...data, name: data.name } : null;
   }
 
-  async createEquipo(nombre: string): Promise<{ id: string; nombre: string }> {
-    const equipoId = this.slug(nombre);
-    const existing = await this.getEquipo(equipoId);
+  async createTeam(name: string): Promise<{ id: string; name: string }> {
+    const teamId = this.slug(name);
+    const existing = await this.getTeam(teamId);
 
     if (existing) {
       throw new Error('Ya existe un equipo con ese nombre');
     }
 
     const { error } = await this.client()
-      .from('equipos')
+      .from('teams')
       .insert({
-        id: equipoId,
-        nombre,
-        raw_data: { nombre },
+        id: teamId,
+        name: name,
+        raw_data: { name },
       });
 
     if (error) {
       throw error;
     }
 
-    return { id: equipoId, nombre };
+    return { id: teamId, name };
   }
 
-  async getPersonal(): Promise<Personal[]> {
+  async getPersonnel(): Promise<Personnel[]> {
     const { data, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .select('*');
 
     if (error) {
       throw error;
     }
 
-    return data ?? [];
+    return (data ?? []).map((row) => this.mapPersonnel(row) as Personnel);
   }
 
-  async getPersonalByEmail(email: string) {
+  async getPersonnelByEmail(email: string) {
     const { data, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .select('*')
-      .eq('correo', email)
+      .eq('email', email)
       .maybeSingle();
 
     if (error) {
       throw error;
     }
 
-    return this.mapPersonal(data);
+    return this.mapPersonnel(data);
   }
 
-  async getPersonalById(id: string) {
+  async getPersonnelById(id: string) {
     const { data, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .select('*')
       .eq('id', id)
       .maybeSingle();
@@ -214,54 +231,54 @@ export class SupabaseDataService {
       throw error;
     }
 
-    return this.mapPersonal(data);
+    return this.mapPersonnel(data);
   }
 
-  async getPersonalByEquipo(equipoId: string): Promise<Personal[]> {
+  async getEmployeeByTeam(teamId: string): Promise<Personnel[]> {
     const { data, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .select('*')
-      .eq('equipo_id', equipoId);
+      .eq('team_id', teamId);
 
     if (error) {
       throw error;
     }
 
-    return data ?? [];
+    return (data ?? []).map((row) => this.mapPersonnel(row) as Personnel);
   }
 
-  async getPersonalOnVacation(): Promise<Personal[]> {
+  async getVacationingPersonnel(): Promise<Personnel[]> {
     const { data, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .select('*')
-      .eq('vacaciones', true);
+      .eq('on_vacations', true);
 
     if (error) {
       throw error;
     }
 
-    return data ?? [];
+    return (data ?? []).map((row) => this.mapPersonnel(row) as Personnel);
   }
 
-  async createPersonal(data: CreatePersonalData): Promise<{ id: string }> {
+  async createPersonnel(data: CreatePersonnelData): Promise<{ id: string }> {
     const id = crypto.randomUUID();
     const row = {
       id,
-      nombre: data.nombre,
-      rol: data.rol,
-      correo: data.correo ?? null,
-      equipo_id: data.equipoId ?? null,
-      estatus: data.estatus ?? 'activo',
+      full_name: data.name,
+      rol: data.role,
+      email: data.email ?? null,
+      team_id: data.teamId ?? null,
+      estatus: data.status ?? 'activo',
       raw_data: {
-        nombre: data.nombre,
-        rol: data.rol,
-        correo: data.correo,
-        equipoId: data.equipoId,
-        estatus: data.estatus ?? 'activo',
+        name: data.name,
+        role: data.role,
+        email: data.email,
+        teamId: data.teamId,
+        status: data.status ?? 'activo',
       },
     };
 
-    const { error } = await this.client().from('personal').insert(row);
+    const { error } = await this.client().from('employees').insert(row);
 
     if (error) {
       throw error;
@@ -270,8 +287,8 @@ export class SupabaseDataService {
     return { id };
   }
 
-  async updatePersonal(personalId: string, data: UpdatePersonalData) {
-    const current = await this.getPersonalById(personalId);
+  async updatePersonnel(personnelId: string, data: UpdatePersonnelData) {
+    const current = await this.getPersonnelById(personnelId);
 
     if (!current) {
       return null;
@@ -284,16 +301,16 @@ export class SupabaseDataService {
       },
     };
 
-    if (data.nombre !== undefined) updateData.nombre = data.nombre;
-    if (data.rol !== undefined) updateData.rol = data.rol;
-    if (data.correo !== undefined) updateData.correo = data.correo;
-    if (data.equipoId !== undefined) updateData.equipo_id = data.equipoId;
-    if (data.estatus !== undefined) updateData.estatus = data.estatus;
+    if (data.name !== undefined) updateData.full_name = data.name;
+    if (data.role !== undefined) updateData.rol = data.role;
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.teamId !== undefined) updateData.team_id = data.teamId;
+    if (data.status !== undefined) updateData.estatus = data.status;
 
     const { data: updated, error } = await this.client()
-      .from('personal')
+      .from('employees')
       .update(updateData)
-      .eq('id', personalId)
+      .eq('id', personnelId)
       .select('*')
       .single();
 
@@ -301,17 +318,17 @@ export class SupabaseDataService {
       throw error;
     }
 
-    return this.mapPersonal(updated);
+    return this.mapPersonnel(updated);
   }
 
-  async updatePersonalEquipo(personalId: string, equipoId: string) {
+  async updatePersonnelTeam(personnelId: string, teamId: string) {
     const { error } = await this.client()
-      .from('personal')
+      .from('employees')
       .update({
-        equipo_id: equipoId,
-        raw_data: { equipo: equipoId },
+        team_id: teamId,
+        raw_data: { team: teamId },
       })
-      .eq('id', personalId);
+      .eq('id', personnelId);
 
     if (error) {
       throw error;
@@ -320,11 +337,11 @@ export class SupabaseDataService {
     return { ok: true };
   }
 
-  async updatePersonalVacaciones(personalId: string, vacaciones: boolean) {
+  async updatePersonnelVacation(personnelId: string, onVacation: boolean) {
     const { error } = await this.client()
-      .from('personal')
-      .update({ vacaciones })
-      .eq('id', personalId);
+      .from('employees')
+      .update({ on_vacations: onVacation })
+      .eq('id', personnelId);
 
     if (error) {
       throw error;
@@ -333,12 +350,12 @@ export class SupabaseDataService {
     return { ok: true };
   }
 
-  async getSprintsByEquipo(equipoId: string): Promise<Sprint[]> {
+  async getSprintsByTeam(teamId: string): Promise<Sprint[]> {
     const { data, error } = await this.client()
       .from('sprints')
       .select('*')
-      .eq('equipo_id', equipoId)
-      .order('fecha_inicio', { ascending: true });
+      .eq('team_id', teamId)
+      .order('start_date', { ascending: true });
 
     if (error) {
       throw error;
@@ -347,11 +364,11 @@ export class SupabaseDataService {
     return data ?? [];
   }
 
-  async getSprint(equipoId: string, sprintId: string): Promise<Sprint | null> {
+  async getSprint(teamId: string, sprintId: string): Promise<Sprint | null> {
     const { data, error } = await this.client()
       .from('sprints')
       .select('*')
-      .eq('equipo_id', equipoId)
+      .eq('team_id', teamId)
       .eq('firebase_id', sprintId)
       .maybeSingle();
 
@@ -362,60 +379,69 @@ export class SupabaseDataService {
     return data;
   }
 
-  async getIntegrantesBySprint(equipoId: string, sprintId: string): Promise<SprintIntegrante[]> {
+  async getMembersBySprint(teamId: string, sprintId: string): Promise<SprintMember[]> {
     const { data, error } = await this.client()
-      .from('sprint_integrantes')
+      .from('sprint_members')
       .select('*')
-      .eq('equipo_id', equipoId)
-      .eq('sprint_id', `${equipoId}__${sprintId}`);
+      .eq('team_id', teamId)
+      .eq('sprint_id', `${teamId}__${sprintId}`);
 
     if (error) {
       throw error;
     }
 
-    return data ?? [];
+    return (data ?? []).map((row) => this.mapSprintMember(row));
   }
 
-  async getIntegrantesBySprintLegacy(equipoId: string, sprintId: string) {
-    const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
-    return integrantes.map((integrante) => this.mapSprintIntegrante(integrante));
+  async getLegacyMembersBySprint(teamId: string, sprintId: string) {
+    const members = await this.getMembersBySprint(teamId, sprintId);
+    return members.map((member) => ({
+      id: member.firebase_id,
+      name: member.name ?? '',
+      total1: member.total1 ?? 0,
+      total2: member.total2 ?? 0,
+      total3: member.total3 ?? 0,
+      total_final: member.total_final ?? 0,
+      rating: member.rating ?? '',
+      comments: member.comments ?? undefined,
+    }));
   }
 
-  async getHistorialRotaciones() {
+  async getRotationHistory() {
     const { data, error } = await this.client()
-      .from('historial_rotaciones')
+      .from('rotations_history')
       .select('*')
-      .order('fecha', { ascending: false });
+      .order('date', { ascending: false });
 
     if (error) {
       throw error;
     }
 
-    return (data ?? []).map((row) => this.mapHistorial(row));
+    return (data ?? []).map((row) => this.mapHistory(row));
   }
 
-  async addHistorialRotacion(data: {
-    personalId: string;
-    nombre: string;
-    tipo: string;
-    desde: string;
-    hacia: string;
-    desdeNombre?: string;
-    haciaNombre?: string;
-    fecha?: Date;
+  async addRotationHistory(data: {
+    personnelId: string;
+    name: string;
+    type: string;
+    fromTeam: string;
+    toTeam: string;
+    sourceName?: string;
+    destinationName?: string;
+    date?: Date;
   }) {
     const id = crypto.randomUUID();
-    const fecha = data.fecha ?? new Date();
-    const { error } = await this.client().from('historial_rotaciones').insert({
+    const date = data.date ?? new Date();
+    const { error } = await this.client().from('rotations_history').insert({
       id,
-      fecha: fecha.toISOString(),
-      tipo: data.tipo,
-      nombre: data.nombre,
-      personal_id: data.personalId,
-      desde: data.desde,
-      desde_nombre: data.desdeNombre ?? null,
-      hacia: data.hacia,
-      hacia_nombre: data.haciaNombre ?? null,
+      date: date.toISOString(),
+      type: data.type,
+      name: data.name,
+      employee_id: data.personnelId,
+      from_team: data.fromTeam,
+      from_name_team: data.sourceName ?? null,
+      to_team: data.toTeam,
+      to_name_team: data.destinationName ?? null,
       raw_data: data,
     });
 
@@ -426,27 +452,43 @@ export class SupabaseDataService {
     return { ok: true };
   }
 
-  async getModulosRol(rol: string): Promise<ModuloSidebar[]> {
+  async getModulesByRole(role: string): Promise<SidebarModule[]> {
     const { data, error } = await this.client()
-      .from('modulos_sidebar')
+      .from('modules_sidebar')
       .select('*')
       .eq('visible', true)
-      .order('orden', { ascending: true });
+      .order('order', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    const modulos = (data ?? []).filter(
-      (modulo) => Array.isArray(modulo.roles_permitidos) && modulo.roles_permitidos.includes(rol),
+    const modules = (data ?? []).filter(
+      (moduleItem) => Array.isArray(moduleItem.permitted_roles) && moduleItem.permitted_roles.includes(role),
     );
 
-    if (rol === 'Admin') {
-      const modulosADeshabilitar = ['Gestor de Noticias', 'Documentos'];
-      return modulos.filter((modulo) => !modulosADeshabilitar.includes(modulo.nombre ?? ''));
+    if (role === 'Admin') {
+      const modulesToDisable = ['Gestor de Noticias', 'Documentos'];
+      return modules
+        .filter((moduleItem) => !modulesToDisable.includes(moduleItem.name_module ?? ''))
+        .map((moduleItem) => this.mapSidebarModule(moduleItem));
     }
 
-    return modulos;
+    return modules.map((moduleItem) => this.mapSidebarModule(moduleItem));
+  }
+
+  private mapSidebarModule(row: any): SidebarModule {
+    return {
+      id: row.id,
+      name: row.name_module,
+      route: row.route,
+      icon: row.icon,
+      order: row.order,
+      visible: row.visible,
+      permittedRoles: row.permitted_roles,
+      firebase_path: row.firebase_path,
+      raw_data: row.raw_data,
+    };
   }
 
   async getMaintenanceStatus(): Promise<MaintenanceStatus> {
@@ -465,7 +507,7 @@ export class SupabaseDataService {
 
   async getPerformanceConfig() {
     const { data, error } = await this.client()
-      .from('config_evaluaciones')
+      .from('config_evaluations')
       .select('*')
       .eq('id', 'performance')
       .maybeSingle();
@@ -479,10 +521,10 @@ export class SupabaseDataService {
 
   async savePerformanceConfig(data: Record<string, unknown>) {
     const { error } = await this.client()
-      .from('config_evaluaciones')
+      .from('config_evaluations')
       .upsert({
         id: 'performance',
-        secciones: data.secciones ?? null,
+        sections: data.sections ?? null,
         raw_data: data,
       });
 
@@ -495,7 +537,7 @@ export class SupabaseDataService {
 
   async getOtoConfig() {
     const { data, error } = await this.client()
-      .from('config_evaluaciones')
+      .from('config_evaluations')
       .select('*')
       .eq('id', 'one-to-one')
       .maybeSingle();
@@ -509,10 +551,10 @@ export class SupabaseDataService {
 
   async saveOtoConfig(data: Record<string, unknown>) {
     const { error } = await this.client()
-      .from('config_evaluaciones')
+      .from('config_evaluations')
       .upsert({
         id: 'one-to-one',
-        secciones: data.secciones ?? null,
+        sections: data.sections ?? null,
         raw_data: data,
       });
 
@@ -523,195 +565,251 @@ export class SupabaseDataService {
     return { ok: true };
   }
 
-  async savePerformanceEvaluacion(data: CreatePerformanceEvaluacionDto) {
-    const numeroEvaluacion = data.numeroEvaluacion ?? await this.findNextEvaluationNumber(
+  async savePerformanceEvaluation(data: CreatePerformanceEvaluationDto) {
+    const evaluationNumber = data.evaluationNumber ?? await this.findNextEvaluationNumber(
       'performance_evaluaciones',
-      data.equipoId,
-      data.nombreIngeniero,
+      data.teamId,
+      data.engineerName,
     );
-    const docId = this.slug(data.nombreIngeniero);
-    const collectionId = `performance-${numeroEvaluacion}`;
-    const fecha = new Date().toISOString();
+    const docId = this.slug(data.engineerName);
+    const collectionId = `performance-${evaluationNumber}`;
+    const date = new Date().toISOString();
 
     const { error } = await this.client().from('performance_evaluaciones').insert({
-      id: `${data.equipoId}__${collectionId}__${docId}`,
+      id: `${data.teamId}__${collectionId}__${docId}`,
       firebase_id: docId,
-      equipo_id: data.equipoId,
-      nombre_ingeniero: data.nombreIngeniero,
-      nombre_evaluador: data.nombreEvaluador,
-      periodo: data.periodo,
-      numero_evaluacion: numeroEvaluacion,
-      fecha,
-      respuestas: data.respuestas,
-      logros: data.logros,
-      potencial_crecimiento: data.potencialCrecimiento,
-      observaciones_adicionales: data.observacionesAdicionales,
-      retroalimentacion_confirmada: data.retroalimentacionConfirmada,
+      team_id: data.teamId,
+      name_ingineer: data.engineerName,
+      evaluator_name: data.evaluatorName,
+      period: data.period,
+      evaluation_number: evaluationNumber,
+      date: date,
+      answere: data.answers,
+      achievements: data.achievements,
+      growth_potential: data.growthPotential,
+      additional_observations: data.additionalObservations,
+      feedback_confirmed: data.feedbackConfirmed,
       firebase_collection: collectionId,
-      raw_data: { ...data, numeroEvaluacion, fecha },
+      raw_data: { ...data, evaluationNumber, date },
     });
 
     if (error) {
       throw error;
     }
 
-    const habilitacionActiva = await this.getHabilitacionActiva(data.equipoId);
-    if (habilitacionActiva) {
-      const evaluadosCount = (habilitacionActiva.evaluadosCount || 0) + 1;
-      await this.updateHabilitacionPerformance(habilitacionActiva.id, {
-        evaluados_count: evaluadosCount,
-        estado: evaluadosCount >= (habilitacionActiva.totalEsperados || 0) ? 'Completado' : 'En proceso',
-        ultima_actualizacion: new Date().toISOString(),
+    const activeEnablement = await this.getActiveEnablement(data.teamId);
+    if (activeEnablement) {
+      const evaluatedCount = (activeEnablement.evaluatedCount || 0) + 1;
+      await this.updatePerformanceEnablement(activeEnablement.id, {
+        evaluated_count: evaluatedCount,
+        status: evaluatedCount >= (activeEnablement.totalExpected || 0) ? 'Completado' : 'En proceso',
+        last_update: new Date().toISOString(),
       });
     }
 
-    return { ok: true, numeroEvaluacion };
+    return { ok: true, evaluationNumber };
   }
 
-  async getPerformanceHistorial(equipoId: string) {
+  async getPerformanceHistory(teamId: string) {
     const { data, error } = await this.client()
       .from('performance_evaluaciones')
       .select('*')
-      .eq('equipo_id', equipoId)
-      .order('numero_evaluacion', { ascending: true });
+      .eq('team_id', teamId)
+      .order('evaluation_number', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    return (data ?? []).map((row) => ({
-      ...row.raw_data,
-      id: row.id,
-      numero: row.numero_evaluacion,
-      numeroEvaluacion: row.numero_evaluacion,
-      fecha: row.fecha,
-    }));
+    return (data ?? []).map((row) => {
+      const storedAnswers = row.answere ?? row.raw_data?.answers ?? row.raw_data?.respuestas ?? {};
+      const answers = Object.fromEntries(
+        Object.entries(storedAnswers).map(([key, value]: [string, any]) => [
+          key,
+          {
+            score: Number(value?.score ?? value?.puntaje ?? 0),
+            comment: value?.comment ?? value?.comentario ?? '',
+          },
+        ]),
+      );
+
+      return {
+        id: row.id,
+        teamId: row.team_id,
+        employeeId: row.firebase_id,
+        evaluationNumber: row.evaluation_number,
+        engineerName: row.name_ingineer,
+        evaluatorName: row.evaluator_name,
+        period: row.period,
+        answers,
+        achievements: row.achievements,
+        growthPotential: row.growth_potential,
+        additionalObservations: row.additional_observations,
+        feedbackConfirmed: row.feedback_confirmed,
+        date: row.date,
+      };
+    });
   }
 
-  async saveOtoEvaluacion(data: CreateOtoEvaluacionDto) {
-    const numeroEvaluacion = data.numeroEvaluacion ?? await this.findNextEvaluationNumber(
-      'oto_evaluaciones',
-      data.equipoId,
-      data.nombreIngeniero,
+  async saveOtoEvaluation(data: CreateOtoEvaluationDto) {
+    const evaluationNumber = data.evaluationNumber ?? await this.findNextEvaluationNumber(
+      'oto_evaluations',
+      data.teamId,
+      data.engineerName,
     );
-    const docId = this.slug(data.nombreIngeniero);
-    const collectionId = `one-to-one-${numeroEvaluacion}`;
-    const fecha = new Date().toISOString();
+    const docId = this.slug(data.engineerName);
+    const collectionId = `one-to-one-${evaluationNumber}`;
+    const date = new Date().toISOString();
 
-    const { error } = await this.client().from('oto_evaluaciones').insert({
-      id: `${data.equipoId}__${collectionId}__${docId}`,
+    const { error } = await this.client().from('oto_evaluations').insert({
+      id: `${data.teamId}__${collectionId}__${docId}`,
       firebase_id: docId,
-      equipo_id: data.equipoId,
-      nombre_ingeniero: data.nombreIngeniero,
-      nombre_evaluador: data.nombreEvaluador,
-      periodo: data.periodo,
-      numero_evaluacion: numeroEvaluacion,
-      fecha,
-      resumen: data.resumen,
-      sintesis_final: data.sintesisFinal,
-      preguntas_reflexion: data.preguntasReflexion,
-      habilidades_blandas: data.habilidadesBlandas,
+      team_id: data.teamId,
+      name_engineer: data.engineerName,
+      name_evaluator: data.evaluatorName,
+      period: data.period,
+      number_evaluation: evaluationNumber,
+      date,
+      summary: data.summary,
+      final_synthesis: data.finalSummary,
+      reflection_questions: data.reflectionQuestions,
+      soft_skills: data.softSkills,
       firebase_collection: collectionId,
-      raw_data: { ...data, numeroEvaluacion, fecha },
+      raw_data: { ...data, evaluationNumber, date },
     });
 
     if (error) {
       throw error;
     }
 
-    return { ok: true, numeroEvaluacion };
+    return { ok: true, evaluationNumber };
   }
 
-  async getOtoHistorial(equipoId: string) {
+  async getOtoHistory(teamId: string) {
     const { data, error } = await this.client()
-      .from('oto_evaluaciones')
+      .from('oto_evaluations')
       .select('*')
-      .eq('equipo_id', equipoId)
-      .order('numero_evaluacion', { ascending: true });
+      .eq('team_id', teamId)
+      .order('number_evaluation', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    return (data ?? []).map((row) => ({
-      ...row.raw_data,
-      id: row.id,
-      numero: row.numero_evaluacion,
-      numeroEvaluacion: row.numero_evaluacion,
-      fecha: row.fecha,
-    }));
+    return (data ?? []).map((row) => {
+      const storedSummary = row.summary ?? row.raw_data?.summary ?? row.raw_data?.resumen ?? {};
+      const storedSoftSkills = row.soft_skills ?? row.raw_data?.softSkills ?? row.raw_data?.habilidadesBlandas ?? {};
+
+      const summary = {
+        totalAssignedTasks: storedSummary.totalAssignedTasks ?? storedSummary.totalTareasAsignadas ?? 0,
+        assignedDeliveredPercentage:
+          storedSummary.assignedDeliveredPercentage ?? storedSummary.porcentajeAsignadasEntregadas ?? 0,
+        deliveredReturnedPercentage:
+          storedSummary.deliveredReturnedPercentage ?? storedSummary.porcentajeEntregadasDevueltas ?? 0,
+        codeQualityPercentage:
+          storedSummary.codeQualityPercentage ?? storedSummary.porcentajeCalidadCodigo ?? 0,
+        averageFinalTotal: storedSummary.averageFinalTotal ?? storedSummary.promedioTotalFinal ?? 0,
+      };
+
+      const softSkills = Object.fromEntries(
+        Object.entries(storedSoftSkills).map(([key, value]: [string, any]) => [
+          key,
+          {
+            rating: Number(value?.rating ?? value?.calificacion ?? 0),
+            comment: value?.comment ?? value?.comentario ?? '',
+          },
+        ]),
+      );
+
+      return {
+        id: row.id,
+        teamId: row.team_id,
+        employeeId: row.firebase_id,
+        evaluationNumber: row.number_evaluation,
+        engineerName: row.name_engineer,
+        evaluatorName: row.name_evaluator,
+        period: row.period,
+        summary,
+        finalSummary: row.final_synthesis ?? row.raw_data?.finalSummary ?? row.raw_data?.sintesisFinal ?? {},
+        reflectionQuestions:
+          row.reflection_questions ?? row.raw_data?.reflectionQuestions ?? row.raw_data?.preguntasReflexion ?? {},
+        softSkills,
+        date: row.date,
+      };
+    });
   }
 
   private async findNextEvaluationNumber(
-    table: 'performance_evaluaciones' | 'oto_evaluaciones',
-    equipoId: string,
-    nombreIngeniero: string,
+    table: 'performance_evaluaciones' | 'oto_evaluations',
+    teamId: string,
+    engineerName: string,
   ): Promise<number> {
-    const docId = this.slug(nombreIngeniero);
+    const docId = this.slug(engineerName);
     const { data, error } = await this.client()
       .from(table)
-      .select('numero_evaluacion, firebase_id')
-      .eq('equipo_id', equipoId)
-      .order('numero_evaluacion', { ascending: false });
+      .select(table === 'performance_evaluaciones' ? 'evaluation_number, firebase_id' : 'number_evaluation, firebase_id')
+      .eq('team_id', teamId)
+      .order(table === 'performance_evaluaciones' ? 'evaluation_number' : 'number_evaluation', { ascending: false });
 
     if (error) {
       throw error;
     }
 
     const rows = data ?? [];
-    const latest = rows[0]?.numero_evaluacion ?? 0;
-    const existsInLatest = rows.some((row) => row.numero_evaluacion === latest && row.firebase_id === docId);
+    const numberField = table === 'performance_evaluaciones' ? 'evaluation_number' : 'number_evaluation';
+    const latest = rows[0]?.[numberField] ?? 0;
+    const existsInLatest = rows.some((row) => row[numberField] === latest && row.firebase_id === docId);
 
     if (!latest) return 1;
     return existsInLatest ? latest + 1 : latest;
   }
 
-  async habilitarPerformance(equipoId: string, nombreAdmin: string) {
-    const existente = await this.getHabilitacionActiva(equipoId);
+  async enablePerformance(teamId: string, adminName: string) {
+    const existente = await this.getActiveEnablement(teamId);
     if (existente) return existente;
 
-    const personal = await this.getPersonalByEquipo(equipoId);
-    const totalEsperados = personal.filter((p) => !['Arquitecto', 'Admin'].includes(String(p.rol || ''))).length;
-    const equipo = await this.getEquipo(equipoId);
+    const employee = await this.getEmployeeByTeam(teamId);
+    const totalExpected = employee .filter((p) => !['Arquitecto', 'Admin'].includes(String(p.role || ''))).length;
+    const team = await this.getTeam(teamId);
     const id = crypto.randomUUID();
-    const fechaHabilitacion = new Date().toISOString();
+    const enabledAt = new Date().toISOString();
     const row = {
       id,
-      equipo_id: equipoId,
-      nombre_equipo: equipo?.nombre || equipoId,
-      nombre_admin: nombreAdmin,
-      fecha_habilitacion: fechaHabilitacion,
-      estado: 'Pendiente',
-      evaluados_count: 0,
-      total_esperados: totalEsperados,
+      teams_id: teamId,
+      teams_name: team?.name || teamId,
+      admin_name: adminName,
+      init_date: enabledAt,
+      status: 'Pendiente',
+      evaluated_count: 0,
+      'total_ expected': totalExpected,
       raw_data: {
-        equipoId,
-        nombreEquipo: equipo?.nombre || equipoId,
-        nombreAdmin,
-        fechaHabilitacion,
-        estado: 'Pendiente',
-        evaluadosCount: 0,
-        totalEsperados,
+        teamId,
+        teamName: team?.name || teamId,
+        adminName,
+        enabledAt,
+        status: 'Pendiente',
+        evaluatedCount: 0,
+        totalExpected,
       },
     };
 
-    const { error } = await this.client().from('habilitaciones_desempeno').insert(row);
+    const { error } = await this.client().from('performance_ qualifications').insert(row);
 
     if (error) {
       throw error;
     }
 
-    return this.mapHabilitacion(row);
+    return this.mapEnablement(row);
   }
 
-  async getHabilitacionesPerformance(equipoId?: string) {
+  async getPerformanceEnablements(teamId?: string) {
     let query = this.client()
-      .from('habilitaciones_desempeno')
+      .from('performance_ qualifications')
       .select('*')
-      .order('fecha_habilitacion', { ascending: false });
+      .order('init_date', { ascending: false });
 
-    if (equipoId) {
-      query = query.eq('equipo_id', equipoId);
+    if (teamId) {
+      query = query.eq('teams_id', teamId);
     }
 
     const { data, error } = await query;
@@ -720,16 +818,16 @@ export class SupabaseDataService {
       throw error;
     }
 
-    return (data ?? []).map((row) => this.mapHabilitacion(row));
+    return (data ?? []).map((row) => this.mapEnablement(row));
   }
 
-  async getHabilitacionActiva(equipoId: string) {
+  async getActiveEnablement(teamId: string) {
     const { data, error } = await this.client()
-      .from('habilitaciones_desempeno')
+      .from('performance_ qualifications')
       .select('*')
-      .eq('equipo_id', equipoId)
-      .in('estado', ['Pendiente', 'En proceso'])
-      .order('fecha_habilitacion', { ascending: false })
+      .eq('teams_id', teamId)
+      .in('status', ['Pendiente', 'En proceso'])
+      .order('init_date', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -737,15 +835,15 @@ export class SupabaseDataService {
       throw error;
     }
 
-    return data ? this.mapHabilitacion(data) : null;
+    return data ? this.mapEnablement(data) : null;
   }
 
-  private async updateHabilitacionPerformance(
+  private async updatePerformanceEnablement(
     id: string,
-    updates: { evaluados_count: number; estado: string; ultima_actualizacion: string },
+    updates: { evaluated_count: number; status: string; last_update: string },
   ) {
     const { data: current, error: currentError } = await this.client()
-      .from('habilitaciones_desempeno')
+      .from('performance_ qualifications')
       .select('raw_data')
       .eq('id', id)
       .maybeSingle();
@@ -756,14 +854,14 @@ export class SupabaseDataService {
 
     const rawData = (current?.raw_data ?? {}) as Record<string, unknown>;
     const { error } = await this.client()
-      .from('habilitaciones_desempeno')
+      .from('performance_ qualifications')
       .update({
         ...updates,
         raw_data: {
           ...rawData,
-          evaluadosCount: updates.evaluados_count,
-          estado: updates.estado,
-          ultimaActualizacion: updates.ultima_actualizacion,
+          evaluatedCount: updates.evaluated_count,
+          status: updates.status,
+          lastUpdate: updates.last_update,
         },
       })
       .eq('id', id);
@@ -773,39 +871,39 @@ export class SupabaseDataService {
     }
   }
 
-  private mapHabilitacion(row: any) {
+  private mapEnablement(row: any) {
     return {
       id: row.id,
-      equipoId: row.equipo_id,
-      nombreEquipo: row.nombre_equipo,
-      nombreAdmin: row.nombre_admin,
-      fechaHabilitacion: row.fecha_habilitacion,
-      estado: row.estado,
-      evaluadosCount: row.evaluados_count,
-      totalEsperados: row.total_esperados,
-      ultimaActualizacion: row.ultima_actualizacion,
+      teamId: row.teams_id,
+      teamName: row.teams_name,
+      adminName: row.admin_name,
+      enabledAt: row.init_date,
+      status: row.status,
+      evaluatedCount: row.evaluated_count,
+      totalExpected: row['total_ expected'],
+      lastUpdate: row.last_update,
     };
   }
 
-  async obtenerMetricas(equipoId: string, sprintId: string) {
-    const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
-    const sprint = await this.getSprint(equipoId, sprintId);
+  async getMetrics(teamId: string, sprintId: string) {
+    const members = await this.getMembersBySprint(teamId, sprintId);
+    const sprint = await this.getSprint(teamId, sprintId);
 
-    const resumen = integrantes
-      .filter((integrante) => integrante.calificacion !== 'Arquitecto')
-      .map((integrante) => ({
-        nombre: integrante.nombre,
-        total1: integrante.total1,
-        total2: integrante.total2,
-        total3: integrante.total3,
-        totalFinal: `${integrante.total_final}% (${integrante.calificacion})`,
-        comentarios: integrante.comentarios ?? '—',
+    const summary = members
+      .filter((member) => member.rating !== 'Arquitecto')
+      .map((member) => ({
+        name: member.name,
+        total1: member.total1,
+        total2: member.total2,
+        total3: member.total3,
+        totalFinal: `${member.total_final}% (${member.rating})`,
+        comments: member.comments ?? '—',
       }));
 
     return {
-      fechaInicio: sprint?.fecha_inicio ? this.formatDate(sprint.fecha_inicio) : '',
-      fechaFin: sprint?.fecha_fin ? this.formatDate(sprint.fecha_fin) : '',
-      resumen,
+      startDate: sprint?.start_date ? this.formatDate(sprint.start_date) : '',
+      endDate: sprint?.end_date ? this.formatDate(sprint.end_date) : '',
+      summary,
     };
   }
 
@@ -817,44 +915,44 @@ export class SupabaseDataService {
     });
   }
 
-  async getSprintEvaluationStatus(equipoId: string, specificSprintId?: string) {
-    const sprints = await this.getSprintsByEquipo(equipoId);
+  async getSprintEvaluationStatus(teamId: string, specificSprintId?: string) {
+    const sprints = await this.getSprintsByTeam(teamId);
     let activeSprint = specificSprintId
       ? sprints.find((s) => s.firebase_id === specificSprintId)
       : sprints
-        .filter((s) => s.sprint_cerrado !== true)
+        .filter((s) => s.sprint_closed !== true)
         .sort((a, b) => this.getSprintNumero(a.firebase_id) - this.getSprintNumero(b.firebase_id))[0];
 
     const maxSprintNum = sprints.reduce((max, sprint) => Math.max(max, this.getSprintNumero(sprint.firebase_id)), 0);
-    const sprintNumero = activeSprint ? this.getSprintNumero(activeSprint.firebase_id) : maxSprintNum + 1;
-    const sprintId = activeSprint ? activeSprint.firebase_id : `sprint-${sprintNumero}`;
-    const evaluadosRaw = await this.getIntegrantesBySprint(equipoId, sprintId);
-    const evaluadosNombres = evaluadosRaw.map((e) => String(e.nombre || '').toLowerCase().trim());
-    const personal = await this.getPersonalByEquipo(equipoId);
-    const integrantesEquipo = personal
+    const sprintNumber = activeSprint ? this.getSprintNumero(activeSprint.firebase_id) : maxSprintNum + 1;
+    const sprintId = activeSprint ? activeSprint.firebase_id : `sprint-${sprintNumber}`;
+    const rawEvaluatedMembers = await this.getMembersBySprint(teamId, sprintId);
+    const evaluatedNames = rawEvaluatedMembers.map((e) => String(e.name || '').toLowerCase().trim());
+    const employee = await this.getEmployeeByTeam(teamId);
+    const teamMembers = employee
       .filter((p) => {
-        const rol = String(p.rol || '').toLowerCase().trim();
-        const vacaciones = p.vacaciones === true;
-        const nombre = String(p.nombre || '').toLowerCase().trim();
-        const yaEvaluado = evaluadosNombres.includes(nombre);
-        const esArquitecto = rol === 'arquitecto';
-        const inicioReemplazo = p.inicio_reemplazo_sprint_id
-          ? this.getSprintNumero(p.inicio_reemplazo_sprint_id)
+        const role = String(p.role || '').toLowerCase().trim();
+        const onVacation = p.onVacation === true;
+        const name = String(p.name || '').toLowerCase().trim();
+        const alreadyEvaluated = evaluatedNames.includes(name);
+        const isArchitect = role === 'arquitecto';
+        const replacementStart = p.replacementStartSprintId
+          ? this.getSprintNumero(p.replacementStartSprintId)
           : 0;
 
-        return !yaEvaluado && !esArquitecto && !vacaciones && inicioReemplazo <= sprintNumero;
+        return !alreadyEvaluated && !isArchitect && !onVacation && replacementStart <= sprintNumber;
       })
       .map((p) => ({
-        nombre: p.nombre,
-        rol: p.rol,
-        vacaciones: p.vacaciones ?? false,
-        inicioReemplazoSprintId: p.inicio_reemplazo_sprint_id ?? null,
+        name: p.name,
+        role: p.role,
+        onVacation: p.onVacation ?? false,
+        replacementStartSprintId: p.replacementStartSprintId ?? null,
       }));
 
-    const fechas = { fechaInicio: '', fechaFin: '' };
+    const dates = { startDate: '', endDate: '' };
     if (activeSprint) {
-      fechas.fechaInicio = activeSprint.fecha_inicio ? activeSprint.fecha_inicio.split('T')[0] : '';
-      fechas.fechaFin = activeSprint.fecha_fin ? activeSprint.fecha_fin.split('T')[0] : '';
+      dates.startDate = activeSprint.start_date ? activeSprint.start_date.split('T')[0] : '';
+      dates.endDate = activeSprint.end_date ? activeSprint.end_date.split('T')[0] : '';
     } else {
       const hoy = new Date();
       const diaSemana = hoy.getDay();
@@ -862,37 +960,37 @@ export class SupabaseDataService {
       lunes.setDate(hoy.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
       const viernes = new Date(lunes);
       viernes.setDate(lunes.getDate() + 4);
-      fechas.fechaInicio = lunes.toISOString().split('T')[0];
-      fechas.fechaFin = viernes.toISOString().split('T')[0];
+      dates.startDate = lunes.toISOString().split('T')[0];
+      dates.endDate = viernes.toISOString().split('T')[0];
     }
 
     return {
       sprintId,
-      sprintNumero,
-      integrantesEquipo,
-      fechas,
-      fechasGuardadas: !!activeSprint,
-      sprintCerrado: activeSprint ? activeSprint.sprint_cerrado === true : false,
+      sprintNumber,
+      teamMembers,
+      dates,
+      datesSaved: !!activeSprint,
+      sprintClosed: activeSprint ? activeSprint.sprint_closed === true : false,
     };
   }
 
-  async guardarEvaluacion(data: GuardarEvaluacionRequest) {
-    const nombreIngeniero = data.ingeniero.split(' – ')[0];
-    const integranteId = this.slug(nombreIngeniero);
-    const sprintPrimaryId = this.sprintPrimaryId(data.equipoId, data.sprintId);
-    const sprint = await this.getSprint(data.equipoId, data.sprintId);
+  async saveEvaluation(data: SaveEvaluationRequest) {
+    const engineerName = data.engineer.split(' – ')[0];
+    const memberId = this.slug(engineerName);
+    const sprintPrimaryId = this.sprintPrimaryId(data.teamId, data.sprintId);
+    const sprint = await this.getSprint(data.teamId, data.sprintId);
 
     if (!sprint) {
       const { error } = await this.client().from('sprints').insert({
         id: sprintPrimaryId,
         firebase_id: data.sprintId,
-        equipo_id: data.equipoId,
-        fecha_inicio: new Date(data.fechaInicio).toISOString(),
-        fecha_fin: new Date(data.fechaFin).toISOString(),
-        sprint_cerrado: false,
+        team_id: data.teamId,
+        start_date: new Date(data.startDate).toISOString(),
+        end_date: new Date(data.endDate).toISOString(),
+        sprint_closed: false,
         raw_data: {
-          fecha_inicio: data.fechaInicio,
-          fecha_fin: data.fechaFin,
+          fecha_inicio: data.startDate,
+          fecha_fin: data.endDate,
           sprint_cerrado: false,
         },
       });
@@ -900,56 +998,56 @@ export class SupabaseDataService {
       if (error) throw error;
     }
 
-    const metricas = data.metricas ?? {};
-    const { error: integranteError } = await this.client().from('sprint_integrantes').upsert({
-      id: `${sprintPrimaryId}__${integranteId}`,
-      firebase_id: integranteId,
+    const metrics = data.metrics ?? {};
+    const { error: memberError } = await this.client().from('sprint_members').upsert({
+      id: `${sprintPrimaryId}__${memberId}`,
+      firebase_id: memberId,
       sprint_id: sprintPrimaryId,
-      equipo_id: data.equipoId,
-      nombre: nombreIngeniero,
-      tareas_asignadas: metricas.tareasAsignadas ?? null,
-      tareas_entregadas: metricas.tareasEntregadas ?? metricas.tareasEntregadas2 ?? null,
-      tareas_devueltas: metricas.tareasDevueltas ?? null,
-      calidad_codigo: metricas.calidadCodigo ?? null,
-      total1: metricas.total1 ?? null,
-      total2: metricas.total2 ?? null,
-      total3: metricas.total3 ?? null,
-      total_final: data.puntuacionFinal,
-      calificacion: data.calificacionTexto,
-      comentarios: data.comentarios ?? null,
-      evaluado_por: data.evaluadorCorreo,
-      fecha_evaluacion: new Date().toISOString(),
+      team_id: data.teamId,
+      employee_name: engineerName,
+      assigned_tasks: metrics.assignedTasks ?? null,
+      delivered_tasks: metrics.deliveredTasks ?? metrics.deliveredTasksAlternative ?? null,
+      returned_tasks: metrics.returnedTasks ?? null,
+      code_quality: metrics.codeQuality ?? null,
+      total1: metrics.total1 ?? null,
+      total2: metrics.total2 ?? null,
+      total3: metrics.total3 ?? null,
+      total_final: data.finalScore,
+      qualification: data.ratingLabel,
+      comments: data.comments ?? null,
+      evaluated_by: data.evaluatorEmail,
+      evaluation_date: new Date().toISOString(),
       raw_data: {
-        nombre: nombreIngeniero,
-        ...metricas,
-        total_final: data.puntuacionFinal,
-        calificacion: data.calificacionTexto,
-        comentarios: data.comentarios,
-        evaluado_por: data.evaluadorCorreo,
+        name: engineerName,
+        ...metrics,
+        total_final: data.finalScore,
+        rating: data.ratingLabel,
+        comments: data.comments,
+        evaluado_por: data.evaluatorEmail,
       },
     });
 
-    if (integranteError) throw integranteError;
+    if (memberError) throw memberError;
 
-    const integrantes = await this.getIntegrantesBySprint(data.equipoId, data.sprintId);
-    const personal = await this.getPersonalByEquipo(data.equipoId);
-    const totalEsperados = personal.filter((p) => {
-      const rol = String(p.rol || '').toLowerCase().trim();
-      return rol !== 'arquitecto' && p.vacaciones !== true;
+    const members = await this.getMembersBySprint(data.teamId, data.sprintId);
+    const employee = await this.getEmployeeByTeam(data.teamId);
+    const totalExpected = employee.filter((p) => {
+      const role = String(p.role || '').toLowerCase().trim();
+      return role !== 'arquitecto' && p.onVacation !== true;
     }).length;
-    let sprintCerrado = false;
+    let sprintClosed = false;
 
-    if (totalEsperados > 0 && integrantes.length >= totalEsperados) {
+    if (totalExpected > 0 && members.length >= totalExpected) {
       const { error } = await this.client()
         .from('sprints')
-        .update({ sprint_cerrado: true })
+        .update({ sprint_closed: true })
         .eq('id', sprintPrimaryId);
 
       if (error) throw error;
-      sprintCerrado = true;
+      sprintClosed = true;
     }
 
-    const nextState = await this.getSprintEvaluationStatus(data.equipoId);
-    return { ok: true, sprintCerrado, nextState };
+    const nextState = await this.getSprintEvaluationStatus(data.teamId);
+    return { ok: true, sprintClosed, nextState };
   }
 }

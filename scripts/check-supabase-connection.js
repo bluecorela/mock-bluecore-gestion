@@ -7,16 +7,16 @@ try {
 }
 
 const tables = [
-  'equipos',
-  'personal',
+  'teams',
+  'employees',
   'sprints',
-  'sprint_integrantes',
+  'sprint_members',
   'performance_evaluaciones',
-  'oto_evaluaciones',
-  'historial_rotaciones',
-  'modulos_sidebar',
-  'config_evaluaciones',
-  'habilitaciones_desempeno',
+  'oto_evaluations',
+  'rotations_history',
+  'modules_sidebar',
+  'config_evaluations',
+  'performance_ qualifications',
   'settings',
 ];
 
@@ -71,7 +71,7 @@ async function main() {
 
   if (jwtRole && jwtRole !== 'service_role') {
     throw new Error(
-      `SUPABASE_SERVICE_ROLE_KEY tiene rol "${jwtRole}". Debes usar la service_role key, no anon.`,
+      `SUPABASE_SERVICE_ROLE_KEY tiene role "${jwtRole}". Debes usar la service_role key, no anon.`,
     );
   }
 

@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body, Param, BadRequestException, Query } from '@nestjs/common';
 import { PerformanceService } from './performance.service';
-import { CreatePerformanceEvaluacionDto } from './dto/performance-evaluacion.dto';
+import { CreatePerformanceEvaluationDto } from './dto/performance-evaluation.dto';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { PerformanceConfigDto } from './dto/performance-config.dto';
 
@@ -26,35 +26,35 @@ export class PerformanceController {
     @Post()
     @ApiOperation({ summary: 'Guardar una evaluación de desempeño' })
     @ApiResponse({ status: 201, description: 'Evaluación guardada' })
-    async save(@Body() data: CreatePerformanceEvaluacionDto) {
+    async save(@Body() data: CreatePerformanceEvaluationDto) {
         return this.performanceService.save(data);
     }
 
-    @Get('historial/:equipoId')
+    @Get('history/:teamId')
     @ApiOperation({ summary: 'Obtener historial de evaluaciones de desempeño por equipo' })
-    async getHistorial(@Param('equipoId') equipoId: string) {
-        if (!equipoId) throw new BadRequestException('El equipoId es obligatorio');
-        return this.performanceService.getHistorial(equipoId);
+    async getHistory(@Param('teamId') teamId: string) {
+        if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+        return this.performanceService.getHistory(teamId);
     }
 
-    @Post('habilitar')
+    @Post('enable')
     @ApiOperation({ summary: 'Habilitar un nuevo periodo de evaluación para un equipo' })
-    async habilitar(@Body() body: { equipoId: string, nombreAdmin: string }) {
-        if (!body.equipoId || !body.nombreAdmin) {
+    async enable(@Body() body: { teamId: string, adminName: string }) {
+        if (!body.teamId || !body.adminName) {
             throw new BadRequestException('equipoId y nombreAdmin son obligatorios');
         }
-        return this.performanceService.habilitarEvaluacion(body.equipoId, body.nombreAdmin);
+        return this.performanceService.enableEvaluation(body.teamId, body.adminName);
     }
 
-    @Get('habilitaciones')
+    @Get('enablements')
     @ApiOperation({ summary: 'Listar historial de habilitaciones de evaluaciones' })
-    async getHabilitaciones(@Query('equipoId') equipoId?: string) {
-        return this.performanceService.getHabilitaciones(equipoId);
+    async getEnablements(@Query('teamId') teamId?: string) {
+        return this.performanceService.getEnablements(teamId);
     }
 
-    @Get('habilitacion-activa/:equipoId')
+    @Get('active-enablement/:teamId')
     @ApiOperation({ summary: 'Obtener la habilitación activa para un equipo' })
-    async getHabilitacionActiva(@Param('equipoId') equipoId: string) {
-        return this.performanceService.getHabilitacionActiva(equipoId);
+    async getActiveEnablement(@Param('teamId') teamId: string) {
+        return this.performanceService.getActiveEnablement(teamId);
     }
 }

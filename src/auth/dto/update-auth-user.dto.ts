@@ -5,12 +5,12 @@ export class UpdateAuthUserDto {
   @ApiPropertyOptional({ description: 'Nombre del usuario', example: 'Juan Pérez' })
   @IsOptional()
   @IsString()
-  nombre?: string;
+  name?: string;
 
   @ApiPropertyOptional({ description: 'Correo electrónico', example: 'juan@example.com' })
   @IsOptional()
   @IsEmail()
-  correo?: string;
+  email?: string;
 
   @ApiPropertyOptional({
     description: 'Nueva contraseña',
@@ -30,7 +30,7 @@ export class UpdateAuthUserDto {
   @IsOptional()
   @IsString()
   @IsIn(['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'])
-  rol?: string;
+  role?: string;
 
   @ApiPropertyOptional({
     description: 'ID del equipo. Enviar null para quitar equipo.',
@@ -38,7 +38,7 @@ export class UpdateAuthUserDto {
     nullable: true,
   })
   @IsOptional()
-  equipoId?: string | null;
+  teamId?: string | null;
 
   @ApiPropertyOptional({
     description: 'Estado del usuario',
@@ -48,7 +48,7 @@ export class UpdateAuthUserDto {
   @IsOptional()
   @IsString()
   @IsIn(['activo', 'inactivo'])
-  estatus?: 'activo' | 'inactivo';
+  status?: 'activo' | 'inactivo';
 
   @ApiPropertyOptional({
     description: 'Confirmar automáticamente el correo si se cambia en Supabase Auth',

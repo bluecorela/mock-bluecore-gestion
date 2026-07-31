@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreatePerformanceEvaluacionDto } from './dto/performance-evaluacion.dto';
+import { CreatePerformanceEvaluationDto } from './dto/performance-evaluation.dto';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
@@ -16,20 +16,32 @@ export class PerformanceService {
      */
     async getConfig() {
         const config = await this.supabaseDataService.getPerformanceConfig();
+        const storedQuestions = config?.questions ?? config?.preguntas;
+        const storedAnswers = config?.answers ?? config?.respuestas;
 
-        if (!config || !config.preguntas || !config.respuestas) {
+        if (!config || !Array.isArray(storedQuestions) || !storedAnswers) {
             throw new NotFoundException(
                 'No se encontró configuración de evaluación en Supabase. ' +
                 'Ejecuta POST /performance/seed para cargar la configuración inicial.'
             );
         }
 
-        const preguntas = (config.preguntas as any[]).map((p, index) => ({
-            clave: p.clave,
+        const questions = storedQuestions.map((p: any, index: number) => ({
+            key: p.key ?? p.clave,
             label: `${index + 1}. ${p.label}`
         }));
 
-        return { preguntas, respuestas: config.respuestas };
+        const answers = Object.fromEntries(
+            Object.entries(storedAnswers as Record<string, any[]>).map(([key, options]) => [
+                key,
+                options.map((option) => ({
+                    value: option.value ?? option.valor,
+                    description: option.description ?? option.descripcion,
+                })),
+            ]),
+        );
+
+        return { questions, answers };
     }
 
     // /**
@@ -37,23 +49,23 @@ export class PerformanceService {
     //  * Solo necesita ejecutarse una vez (o cuando se quiera resetear la config).
     //  */
     async seedConfig() {
-        const preguntas = [
-            { clave: 'conocimientoTecnico', label: '¿Cómo evalúa el conocimiento del colaborador en lenguajes de programación / base de datos?' },
-            { clave: 'usoGit', label: '¿Cómo evalúa el conocimiento del colaborador en uso de sistemas de control de versiones (Git)?' },
-            { clave: 'calidadCodigo', label: '¿Cómo evalúa la calidad del código desarrollado por el colaborador?' },
-            { clave: 'agilMetodologia', label: '¿Cómo evalúa el conocimiento y aplicación de metodologías ágiles (Scrum) por parte del colaborador?' },
-            { clave: 'colaboracionEquipo', label: '¿Cómo evalúa la colaboración y participación del colaborador en el equipo de trabajo?' },
-            { clave: 'rapidezPrecision', label: '¿Cómo evalúas la rapidez y precisión del colaborador para ejecutar sus tareas y cumplir con los tiempos establecidos sin comprometer la calidad?' },
-            { clave: 'resolucionProblemas', label: '¿Cómo evalúa la capacidad del colaborador para resolver problemas técnicos y tomar decisiones?' },
-            { clave: 'atencionDetalle', label: '¿Cómo evalúa la atención al detalle del colaborador en sus tareas y su capacidad para seguir indicaciones con precisión?' },
-            { clave: 'proactividad', label: '¿Cómo evalúas la capacidad del colaborador para identificar oportunidades, anticiparse a problemas y asumir responsabilidades adicionales sin necesidad de ser solicitado?' },
-            { clave: 'autonomia', label: '¿Qué tan efectivo consideras que el colaborador trabaja de manera autónoma, comprendiendo claramente sus responsabilidades y ejecutándolas sin necesidad de instrucciones constantes?' },
-            { clave: 'comunicacion', label: '¿Cómo evalúa la comunicación del colaborador con el equipo y los clientes?' },
-            { clave: 'disponibilidadRemota', label: '¿Cómo evalúa la disponibilidad del colaborador para responder mensajes directos de manera instantánea durante su jornada de trabajo remoto?' },
-            { clave: 'liderazgo', label: '¿Cómo evalúa el potencial de liderazgo del colaborador en el equipo?' }
+        const questions = [
+            { key: 'conocimientoTecnico', label: '¿Cómo evalúa el conocimiento del colaborador en lenguajes de programación / base de datos?' },
+            { key: 'usoGit', label: '¿Cómo evalúa el conocimiento del colaborador en uso de sistemas de control de versiones (Git)?' },
+            { key: 'calidadCodigo', label: '¿Cómo evalúa la calidad del código desarrollado por el colaborador?' },
+            { key: 'agilMetodologia', label: '¿Cómo evalúa el conocimiento y aplicación de metodologías ágiles (Scrum) por parte del colaborador?' },
+            { key: 'colaboracionEquipo', label: '¿Cómo evalúa la colaboración y participación del colaborador en el equipo de trabajo?' },
+            { key: 'rapidezPrecision', label: '¿Cómo evalúas la rapidez y precisión del colaborador para ejecutar sus tareas y cumplir con los tiempos establecidos sin comprometer la calidad?' },
+            { key: 'resolucionProblemas', label: '¿Cómo evalúa la capacidad del colaborador para resolver problemas técnicos y tomar decisiones?' },
+            { key: 'atencionDetalle', label: '¿Cómo evalúa la atención al detalle del colaborador en sus tareas y su capacidad para seguir indicaciones con precisión?' },
+            { key: 'proactividad', label: '¿Cómo evalúas la capacidad del colaborador para identificar oportunidades, anticiparse a problemas y asumir responsabilidades adicionales sin necesidad de ser solicitado?' },
+            { key: 'autonomia', label: '¿Qué tan efectivo consideras que el colaborador trabaja de manera autónoma, comprendiendo claramente sus responsabilidades y ejecutándolas sin necesidad de instrucciones constantes?' },
+            { key: 'comunicacion', label: '¿Cómo evalúa la comunicación del colaborador con el equipo y los clientes?' },
+            { key: 'disponibilidadRemota', label: '¿Cómo evalúa la disponibilidad del colaborador para responder mensajes directos de manera instantánea durante su jornada de trabajo remoto?' },
+            { key: 'liderazgo', label: '¿Cómo evalúa el potencial de liderazgo del colaborador en el equipo?' }
         ];
 
-        const respuestas = {
+        const answers = {
             conocimientoTecnico: [
                 { valor: 7.7, descripcion: 'Alto (7.7 puntos)' },
                 { valor: 5, descripcion: 'Medio (5 puntos)' },
@@ -64,7 +76,7 @@ export class PerformanceService {
                 { valor: 5, descripcion: 'Medio (5 puntos)' },
                 { valor: 2.5, descripcion: 'Bajo (2.5 puntos)' }
             ],
-            calidadCodigo: [
+            codeQuality: [
                 { valor: 7.7, descripcion: 'Cumple con estándares y mejores prácticas (7.7 puntos)' },
                 { valor: 5, descripcion: 'Requiere algunas mejoras (5 puntos)' },
                 { valor: 2.5, descripcion: 'Necesita mejorar significativamente (2.5 puntos)' }
@@ -74,7 +86,7 @@ export class PerformanceService {
                 { valor: 5, descripcion: 'Medio (5 puntos)' },
                 { valor: 2.5, descripcion: 'Bajo (2.5 puntos)' }
             ],
-            colaboracionEquipo: [
+            teamCollaboration: [
                 { valor: 7.7, descripcion: 'Alto (7.7 puntos)' },
                 { valor: 5, descripcion: 'Medio (5 puntos)' },
                 { valor: 2.5, descripcion: 'Bajo (2.5 puntos)' }
@@ -122,31 +134,31 @@ export class PerformanceService {
         };
 
         await this.supabaseDataService.savePerformanceConfig({
-            preguntas,
-            respuestas,
-            fechaActualizacion: new Date().toISOString()
+            questions,
+            answers,
+            updatedAt: new Date().toISOString()
         });
 
         return { ok: true, message: 'Configuración de performance importada a Supabase exitosamente' };
     }
 
-    async save(data: CreatePerformanceEvaluacionDto) {
-        return this.supabaseDataService.savePerformanceEvaluacion(data);
+    async save(data: CreatePerformanceEvaluationDto) {
+        return this.supabaseDataService.savePerformanceEvaluation(data);
     }
 
-    async getHistorial(equipoId: string) {
-        return this.supabaseDataService.getPerformanceHistorial(equipoId);
+    async getHistory(teamId: string) {
+        return this.supabaseDataService.getPerformanceHistory(teamId);
     }
 
-    async habilitarEvaluacion(equipoId: string, nombreAdmin: string) {
-        return this.supabaseDataService.habilitarPerformance(equipoId, nombreAdmin);
+    async enableEvaluation(teamId: string, adminName: string) {
+        return this.supabaseDataService.enablePerformance(teamId, adminName);
     }
 
-    async getHabilitaciones(equipoId?: string) {
-        return this.supabaseDataService.getHabilitacionesPerformance(equipoId);
+    async getEnablements(teamId?: string) {
+        return this.supabaseDataService.getPerformanceEnablements(teamId);
     }
 
-    async getHabilitacionActiva(equipoId: string) {
-        return this.supabaseDataService.getHabilitacionActiva(equipoId);
+    async getActiveEnablement(teamId: string) {
+        return this.supabaseDataService.getActiveEnablement(teamId);
     }
 }

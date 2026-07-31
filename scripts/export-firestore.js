@@ -128,7 +128,7 @@ function safeFileName(value) {
 }
 
 function isPlainObject(value) {
-  return Object.prototype.toString.call(value) === '[object Object]';
+  return Object.prototype.function function toString() { [native code] }() { [native code] }.call(value) === '[object Object]';
 }
 
 function serializeFirestoreValue(value) {
@@ -173,7 +173,7 @@ function serializeFirestoreValue(value) {
   if (Buffer.isBuffer(value)) {
     return {
       __type: 'buffer',
-      base64: value.toString('base64'),
+      base64: value.function function toString() { [native code] }() { [native code] }('base64'),
     };
   }
 
@@ -272,13 +272,13 @@ async function exportClientDocument(db, documentPath) {
   };
 }
 
-async function exportClientSprints(db, equipoId) {
-  const sprints = await exportClientCollection(db, `equipos/${equipoId}/sprints`);
+async function exportClientSprints(db, teamId) {
+  const sprints = await exportClientCollection(db, `teams/${teamId}/sprints`);
 
   for (const sprint of sprints) {
     sprint.subcollections.Integrantes = await exportClientCollection(
       db,
-      `equipos/${equipoId}/sprints/${sprint.id}/Integrantes`,
+      `teams/${teamId}/sprints/${sprint.id}/Integrantes`,
     );
   }
 
@@ -307,16 +307,16 @@ async function exportNumberedEvaluationCollections(db, basePath, prefix, maxColl
   return exported;
 }
 
-async function exportClientEvaluaciones(db, equipoId) {
+async function exportClientEvaluations(db, teamId) {
   const performanceDoc = {
     id: 'perfomance',
-    path: `equipos/${equipoId}/evaluaciones/perfomance`,
+    path: `teams/${teamId}/evaluaciones/perfomance`,
     data: null,
     subcollections: {},
   };
   const otoDoc = {
     id: 'one-to-one',
-    path: `equipos/${equipoId}/evaluaciones/one-to-one`,
+    path: `teams/${teamId}/evaluaciones/one-to-one`,
     data: null,
     subcollections: {},
   };
@@ -341,9 +341,9 @@ async function exportClientRootCollection(db, collectionId) {
   const docs = await exportClientCollection(db, collectionId);
 
   if (collectionId === 'equipos') {
-    for (const equipo of docs) {
-      equipo.subcollections.sprints = await exportClientSprints(db, equipo.id);
-      equipo.subcollections.evaluaciones = await exportClientEvaluaciones(db, equipo.id);
+    for (const team of docs) {
+      team.subcollections.sprints = await exportClientSprints(db, team.id);
+      team.subcollections.evaluations = await exportClientEvaluations(db, team.id);
     }
   }
 

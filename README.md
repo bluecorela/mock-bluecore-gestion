@@ -95,13 +95,13 @@ npm run format
 
 The API provides endpoints for:
 
-- **Teams (/equipos)**
-- **Personnel (/personal)**
+- **Teams (`/equipos`, legacy-compatible route)**
+- **Personnel (`/personal`, legacy-compatible route)**
 - **Performance (/performance)**
 - **One to One (/oto)**
-- **Rotation (/rotacion)**
-- **Rotation History (/rotacion-historial)**
-- **Sidebar Modules (/modulos-sidebar)**
+- **Rotation (`/rotacion`, legacy-compatible route)**
+- **Rotation History (`/rotacion-historial`, legacy-compatible route)**
+- **Sidebar Modules (`/modulos-sidebar`, legacy-compatible route)**
 - **Maintenance (/maintenance)**
 
 For detailed API documentation and testing, refer to the Swagger/OpenAPI specs if available, or check the controller files in the `src/` directory.
@@ -122,15 +122,15 @@ src/
 │   └── interfaces/
 ├── firebase/
 │   └── firebase.client.ts     # Legacy Firebase client kept for migration reference
-├── equipos/
-│   ├── equipos.controller.ts  # Teams & Sprints endpoints
-│   ├── equipos.service.ts     # Dashboard, metrics & evaluation logic
-│   ├── equipos.module.ts
+├── teams/
+│   ├── teams.controller.ts  # Teams & Sprints endpoints
+│   ├── teams.service.ts     # Dashboard, metrics & evaluation logic
+│   ├── teams.module.ts
 │   └── dto/
-├── personal/
-│   ├── personal.controller.ts # Personnel endpoints
-│   ├── personal.service.ts
-│   ├── personal.module.ts
+├── personnel/
+│   ├── personnel.controller.ts # Personnel endpoints
+│   ├── personnel.service.ts
+│   ├── personnel.module.ts
 │   └── dto/
 ├── performance/
 │   ├── performance.controller.ts  # Performance evaluation endpoints
@@ -142,20 +142,20 @@ src/
 │   ├── oto.service.ts         # OTO calculation & history logic
 │   ├── oto.module.ts
 │   └── dto/
-├── operaciones/
-│   └── operaciones.service.ts # Centralized performance calculations
-├── rotacion/
-│   ├── rotacion.controller.ts
-│   ├── rotacion.service.ts
-│   └── rotacion.module.ts
-├── rotacion-historial/
-│   ├── rotacion-historial.controller.ts
-│   ├── rotacion-historial.service.ts
-│   └── rotacion-historial.module.ts
-├── modulos-sidebar/
-│   ├── modulos-sidebar.controller.ts
-│   ├── modulos-sidebar.service.ts
-│   └── modulos-sidebar.module.ts
+├── operations/
+│   └── operations.service.ts # Centralized performance calculations
+├── rotation/
+│   ├── rotation.controller.ts
+│   ├── rotation.service.ts
+│   └── rotation.module.ts
+├── rotation-history/
+│   ├── rotation-history.controller.ts
+│   ├── rotation-history.service.ts
+│   └── rotation-history.module.ts
+├── sidebar-modules/
+│   ├── sidebar-modules.controller.ts
+│   ├── sidebar-modules.service.ts
+│   └── sidebar-modules.module.ts
 └── maintenance/
     ├── maintenance.controller.ts
     ├── maintenance.service.ts

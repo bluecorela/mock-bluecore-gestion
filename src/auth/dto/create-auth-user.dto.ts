@@ -5,12 +5,12 @@ export class CreateAuthUserDto {
   @ApiProperty({ description: 'Nombre del usuario', example: 'Juan Pérez' })
   @IsString()
   @IsNotEmpty()
-  nombre: string;
+  name: string;
 
   @ApiProperty({ description: 'Correo electrónico', example: 'juan@example.com' })
   @IsEmail()
   @IsNotEmpty()
-  correo: string;
+  email: string;
 
   @ApiProperty({
     description: 'Contraseña temporal o definitiva',
@@ -29,7 +29,7 @@ export class CreateAuthUserDto {
   @IsString()
   @IsNotEmpty()
   @IsIn(['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'])
-  rol: string;
+  role: string;
 
   @ApiProperty({
     description: 'ID del equipo',
@@ -38,7 +38,7 @@ export class CreateAuthUserDto {
   })
   @IsOptional()
   @IsString()
-  equipoId?: string;
+  teamId?: string;
 
   @ApiProperty({
     description: 'Confirmar automáticamente el correo en Supabase Auth',

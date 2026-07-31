@@ -1,30 +1,31 @@
-export interface ResumenIntegrante {
+export interface MemberSummary {
   id?: string;
-  nombre: string;
+  name: string;
   total1: number;
   total2: number;
   total3: number;
   total_final: number;
-  calificacion: string;
-  comentarios?: string;
+  rating: string;
+  comments?: string;
 }
 
-export interface Equipo {
+export interface Team {
   id: string;
-  nombre: string;
+  name: string;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }
 
-export interface Personal {
+export interface Personnel {
   id: string;
-  nombre: string | null;
-  rol: string | null;
-  correo: string | null;
-  equipo_id: string | null;
-  estatus: 'activo' | 'inactivo' | null;
-  vacaciones: boolean | null;
-  inicio_reemplazo_sprint_id: string | null;
+  name: string | null;
+  role: string | null;
+  email: string | null;
+  teamId: string | null;
+  status: 'activo' | 'inactivo' | null;
+  onVacation: boolean | null;
+  replacementStartSprintId: string | null;
+  team?: { id: string; path: string; referencePath: string } | null;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }
@@ -32,67 +33,66 @@ export interface Personal {
 export interface Sprint {
   id: string;
   firebase_id: string;
-  equipo_id: string;
-  fecha_inicio: string | null;
-  fecha_fin: string | null;
-  sprint_cerrado: boolean | null;
+  team_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  sprint_closed: boolean | null;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }
 
-export interface SprintIntegrante {
+export interface SprintMember {
   id: string;
   firebase_id: string;
   sprint_id: string;
-  equipo_id: string;
-  nombre: string | null;
-  tareas_asignadas: number | null;
-  tareas_entregadas: number | null;
-  tareas_devueltas: number | null;
-  calidad_codigo: number | null;
+  team_id: string;
+  name: string | null;
+  assigned_tasks: number | null;
+  delivered_tasks: number | null;
+  returned_tasks: number | null;
+  code_quality: number | null;
   total1: number | null;
   total2: number | null;
   total3: number | null;
   total_final: number | null;
-  calificacion: string | null;
-  comentarios: string | null;
-  evaluado_por: string | null;
-  fecha_evaluacion: string | null;
+  rating: string | null;
+  comments: string | null;
+  evaluated_by: string | null;
+  evaluation_date: string | null;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }
 
-export interface IngenieroActual {
+export interface CurrentEngineer {
   id: string;
-  nombre: string;
-  inicioReemplazoSprintId: string | null;
-  vacaciones: boolean | null;
+  name: string;
+  replacementStartSprintId: string | null;
+  onVacation: boolean | null;
 }
 
-export interface DashboardIntegrante {
+export interface DashboardMember {
   id?: string;
-  nombre: string;
+  name: string;
   total1?: number | null;
   total2?: number | null;
   total3?: number | null;
   total_final: number | null;
-  calificacion: string | null;
-  comentarios?: string | null;
+  rating: string | null;
+  comments?: string | null;
 }
 
 export interface DashboardSprint {
   id: string;
-  fechaInicio: string | Date | null;
-  fechaFin: string | Date | null;
-  sprint_cerrado: boolean | string | Date | null;
-  sprintsCerrado: boolean | string | Date | null;
-  integrantes: DashboardIntegrante[];
+  startDate: string | Date | null;
+  endDate: string | Date | null;
+  sprintClosed: boolean | null;
+  members: DashboardMember[];
 }
 
-export type SprintEstado = 'Completado' | 'En proceso';
+export type SprintStatus = 'Completado' | 'En proceso';
 
-export interface DashboardSprintConEstado extends DashboardSprint {
-  estado: SprintEstado;
+export interface DashboardSprintWithStatus extends DashboardSprint {
+  status: SprintStatus;
 }
 
 export interface BarChartData {
@@ -100,101 +100,101 @@ export interface BarChartData {
   datasets: Array<{ data: number[] }>;
 }
 
-export interface RendimientoResumen {
+export interface PerformanceSummary {
   sprintId: string;
-  promedio: number;
-  estado: SprintEstado;
-  calificacion: string;
-  totalEvaluados: number;
+  average: number;
+  status: SprintStatus;
+  rating: string;
+  totalEvaluated: number;
 }
 
-export interface TendenciaRendimiento {
+export interface PerformanceTrend {
   labels: string[];
-  valores: number[];
+  values: number[];
 }
 
-export interface EquipoDashboardData {
-  equipo: Pick<Equipo, 'id' | 'nombre'>;
+export interface TeamDashboardData {
+  team: Pick<Team, 'id' | 'name'>;
   stats: {
-    totalMiembros: number;
+    totalMembers: number;
     totalSprints: number;
-    promedioRendimiento: number;
-    rendimientoCalificado: string;
+    averagePerformance: number;
+    ratedPerformance: string;
   };
-  sprints: DashboardSprintConEstado[];
+  sprints: DashboardSprintWithStatus[];
   charts: {
     barChart: BarChartData;
-    lineChart: TendenciaRendimiento | null;
-    sprintGraficoId: string | null;
+    lineChart: PerformanceTrend | null;
+    chartSprintId: string | null;
   };
 }
 
-export interface HistorialRotacion {
+export interface RotationHistory {
   id?: string;
-  personalId?: string;
-  tipo?: string;
-  fecha?: string | Date;
+  personnelId?: string;
+  type?: string;
+  date?: string | Date;
 }
 
-export interface EquipoSprintResponse {
+export interface TeamSprintResponse {
   id: string;
-  nombre: string;
-  fechaInicio: string | Date | null;
-  fechaFin: string | Date | null;
-  sprintCerrado: boolean | null;
+  name: string;
+  startDate: string | Date | null;
+  endDate: string | Date | null;
+  sprintClosed: boolean | null;
 }
 
-export interface GuardarEvaluacionRequest {
-  equipoId: string;
+export interface SaveEvaluationRequest {
+  teamId: string;
   sprintId: string;
-  fechaInicio: string;
-  fechaFin: string;
-  ingeniero: string;
-  metricas: Record<string, number>;
-  puntuacionFinal: number;
-  calificacionTexto: string;
-  comentarios?: string;
-  evaluadorCorreo: string;
+  startDate: string;
+  endDate: string;
+  engineer: string;
+  metrics: Record<string, number>;
+  finalScore: number;
+  ratingLabel: string;
+  comments?: string;
+  evaluatorEmail: string;
 }
 
-export interface CreatePersonalData {
-  nombre: string;
-  rol: string;
-  correo?: string;
-  equipoId?: string;
-  estatus?: 'activo' | 'inactivo';
+export interface CreatePersonnelData {
+  name: string;
+  role: string;
+  email?: string;
+  teamId?: string;
+  status?: 'activo' | 'inactivo';
 }
 
-export interface UpdatePersonalData {
-  nombre?: string;
-  rol?: string;
-  correo?: string | null;
-  equipoId?: string | null;
-  estatus?: 'activo' | 'inactivo';
+export interface UpdatePersonnelData {
+  name?: string;
+  role?: string;
+  email?: string | null;
+  teamId?: string | null;
+  status?: 'activo' | 'inactivo';
 }
 
-export interface HistorialRotacionRow {
+export interface RotationHistoryRow {
   id: string;
-  fecha: string | null;
-  tipo: string | null;
-  nombre: string | null;
-  personal_id: string | null;
-  desde: string | null;
-  desde_nombre: string | null;
-  hacia: string | null;
-  hacia_nombre: string | null;
+  date: string | null;
+  type: string | null;
+  employee_name: string | null;
+  employee_id: string | null;
+  from_team: string | null;
+  from_name_team: string | null;
+  to_team: string | null;
+  to_name_team: string | null;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }
 
-export interface ModuloSidebar {
+export interface SidebarModule {
   id: string;
-  nombre: string | null;
-  ruta: string | null;
+  name: string | null;
+  route: string | null;
   icon: string | null;
-  orden: number | null;
+  order: number | null;
   visible: boolean | null;
-  roles_permitidos: string[] | null;
+  permittedRoles: string[] | null;
   firebase_path?: string | null;
   raw_data?: Record<string, unknown>;
 }

@@ -40,47 +40,47 @@ export class AuthService {
       throw new UnauthorizedException('Token de Supabase inválido o expirado');
     }
 
-    const personal = await this.supabaseDataService.getPersonalByEmail(data.user.email);
+    const personnel = await this.supabaseDataService.getPersonnelByEmail(data.user.email);
 
-    if (personal?.estatus === 'inactivo') {
+    if (personnel?.status === 'inactivo') {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
     return {
       supabaseUserId: data.user.id,
       email: data.user.email,
-      personalId: personal?.id ?? null,
-      nombre: personal?.nombre ?? null,
-      rol: personal?.rol ?? null,
-      equipoId: personal?.equipo_id ?? null,
+      personnelId: personnel?.id ?? null,
+      name: personnel?.name ?? null,
+      role: personnel?.role ?? null,
+      teamId: personnel?.teamId ?? null,
       mustChangePassword: data.user.user_metadata?.mustChangePassword === true,
     };
   }
 
   async getUsers() {
-    return this.supabaseDataService.getPersonal();
+    return this.supabaseDataService.getPersonnel();
   }
 
-  async getUser(personalId: string) {
-    return this.supabaseDataService.getPersonalById(personalId);
+  async getUser(personnelId: string) {
+    return this.supabaseDataService.getPersonnelById(personnelId);
   }
 
   async createUser(data: CreateAuthUserDto) {
-    const existingPersonal = await this.supabaseDataService.getPersonalByEmail(data.correo);
+    const existingPersonnel = await this.supabaseDataService.getPersonnelByEmail(data.email);
 
-    if (existingPersonal) {
+    if (existingPersonnel) {
       throw new BadRequestException('Ya existe un usuario/personal con ese correo');
     }
 
     const { data: authData, error } = await this.supabaseClient.getClient().auth.admin.createUser({
-      email: data.correo,
+      email: data.email,
       password: data.password,
       email_confirm: data.emailConfirm ?? true,
       user_metadata: {
-        nombre: data.nombre,
-        rol: data.rol,
-        equipoId: data.equipoId ?? null,
-        estatus: 'activo',
+        name: data.name,
+        role: data.role,
+        teamId: data.teamId ?? null,
+        status: 'activo',
         mustChangePassword: true,
       },
     });
@@ -89,48 +89,48 @@ export class AuthService {
       throw new BadRequestException(error?.message ?? 'No se pudo crear el usuario en Supabase Auth');
     }
 
-    const personal = await this.supabaseDataService.createPersonal({
-      nombre: data.nombre,
-      rol: data.rol,
-      correo: data.correo,
-      equipoId: data.equipoId,
-      estatus: 'activo',
+    const personnel = await this.supabaseDataService.createPersonnel({
+      name: data.name,
+      role: data.role,
+      email: data.email,
+      teamId: data.teamId,
+      status: 'activo',
     });
 
     const emailResult = data.sendPasswordEmail === false
       ? { sent: false, warning: 'Envío de correo omitido.' }
       : await this.sendUserAccessEmail({
-        to: data.correo,
-        nombre: data.nombre,
+        to: data.email,
+        name: data.name,
         password: data.password,
       });
 
     return {
       ok: true,
       authUserId: authData.user.id,
-      personalId: personal.id,
+      personnelId: personnel.id,
       email: authData.user.email,
       emailSent: emailResult.sent,
       warning: emailResult.warning,
     };
   }
 
-  async updateUser(personalId: string, data: UpdateAuthUserDto) {
-    const currentPersonal = await this.supabaseDataService.getPersonalById(personalId);
+  async updateUser(personnelId: string, data: UpdateAuthUserDto) {
+    const currentPersonnel = await this.supabaseDataService.getPersonnelById(personnelId);
 
-    if (!currentPersonal) {
+    if (!currentPersonnel) {
       return null;
     }
 
-    const updatedPersonal = await this.supabaseDataService.updatePersonal(personalId, {
-      nombre: data.nombre,
-      rol: data.rol,
-      correo: data.correo,
-      equipoId: data.equipoId,
-      estatus: data.estatus,
+    const updatedPersonnel = await this.supabaseDataService.updatePersonnel(personnelId, {
+      name: data.name,
+      role: data.role,
+      email: data.email,
+      teamId: data.teamId,
+      status: data.status,
     });
 
-    const authEmail = data.correo ?? currentPersonal.correo;
+    const authEmail = data.email ?? currentPersonnel.email;
     const authUser = authEmail
       ? await this.findAuthUserByEmail(authEmail)
       : null;
@@ -144,17 +144,17 @@ export class AuthService {
         ban_duration?: string;
       } = {};
 
-      if (data.correo) authUpdate.email = data.correo;
+      if (data.email) authUpdate.email = data.email;
       if (data.password) authUpdate.password = data.password;
-      if (data.correo && data.emailConfirm !== false) authUpdate.email_confirm = true;
-      if (data.estatus) authUpdate.ban_duration = data.estatus === 'inactivo' ? '876000h' : 'none';
+      if (data.email && data.emailConfirm !== false) authUpdate.email_confirm = true;
+      if (data.status) authUpdate.ban_duration = data.status === 'inactivo' ? '876000h' : 'none';
 
       authUpdate.user_metadata = {
         ...(authUser.user_metadata ?? {}),
-        nombre: updatedPersonal?.nombre ?? currentPersonal.nombre,
-        rol: updatedPersonal?.rol ?? currentPersonal.rol,
-        equipoId: updatedPersonal?.equipo_id ?? null,
-        estatus: updatedPersonal?.estatus ?? currentPersonal.estatus ?? 'activo',
+        name: updatedPersonnel?.name ?? currentPersonnel.name,
+        role: updatedPersonnel?.role ?? currentPersonnel.role,
+        teamId: updatedPersonnel?.teamId ?? null,
+        status: updatedPersonnel?.status ?? currentPersonnel.status ?? 'activo',
         mustChangePassword: data.password ? true : authUser.user_metadata?.mustChangePassword === true,
       };
 
@@ -168,15 +168,15 @@ export class AuthService {
 
       const emailResult = data.password && data.sendPasswordEmail !== false
         ? await this.sendUserAccessEmail({
-          to: data.correo ?? authUser.email ?? currentPersonal.correo ?? '',
-          nombre: updatedPersonal?.nombre ?? currentPersonal.nombre,
+          to: data.email ?? authUser.email ?? currentPersonnel.email ?? '',
+          name: updatedPersonnel?.name ?? currentPersonnel.name,
           password: data.password,
         })
         : null;
 
       return {
         ok: true,
-        user: updatedPersonal,
+        user: updatedPersonnel,
         emailSent: emailResult?.sent ?? false,
         warning: emailResult?.warning,
       };
@@ -190,11 +190,11 @@ export class AuthService {
         password: data.password,
         email_confirm: data.emailConfirm ?? true,
         user_metadata: {
-          nombre: updatedPersonal?.nombre ?? currentPersonal.nombre,
-          rol: updatedPersonal?.rol ?? currentPersonal.rol,
-          equipoId: updatedPersonal?.equipo_id ?? null,
-          estatus: updatedPersonal?.estatus ?? currentPersonal.estatus ?? 'activo',
-          personalId,
+          name: updatedPersonnel?.name ?? currentPersonnel.name,
+          role: updatedPersonnel?.role ?? currentPersonnel.role,
+          teamId: updatedPersonnel?.teamId ?? null,
+          status: updatedPersonnel?.status ?? currentPersonnel.status ?? 'activo',
+          personnelId,
           mustChangePassword: true,
         },
       });
@@ -207,13 +207,13 @@ export class AuthService {
         ? { sent: false, warning: 'Envío de correo omitido.' }
         : await this.sendUserAccessEmail({
           to: authEmail,
-          nombre: updatedPersonal?.nombre ?? currentPersonal.nombre,
+          name: updatedPersonnel?.name ?? currentPersonnel.name,
           password: data.password,
         });
 
       return {
         ok: true,
-        user: updatedPersonal,
+        user: updatedPersonnel,
         emailSent: emailResult.sent,
         warning: emailResult.warning,
       };
@@ -221,7 +221,7 @@ export class AuthService {
 
     return {
       ok: true,
-      user: updatedPersonal,
+      user: updatedPersonnel,
       emailSent: false,
     };
   }
@@ -247,7 +247,7 @@ export class AuthService {
     return { ok: true };
   }
 
-  private async sendUserAccessEmail(data: { to: string; nombre?: string | null; password: string }) {
+  private async sendUserAccessEmail(data: { to: string; name?: string | null; password: string }) {
     if (process.env.AUTH_EMAIL_PROVIDER === 'supabase') {
       const frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:4200';
       try {
@@ -260,7 +260,7 @@ export class AuthService {
 
           return {
             sent: false,
-            warning: `Usuario creado, pero Supabase no pudo enviar el correo: ${this.getErrorMessage(error)}`,
+            warning: `Usuario creado, pero Supabase no pudo enviar el email: ${this.getErrorMessage(error)}`,
           };
         }
 
@@ -270,7 +270,7 @@ export class AuthService {
 
         return {
           sent: false,
-          warning: `Usuario creado, pero Supabase no pudo enviar el correo: ${this.getErrorMessage(error)}`,
+          warning: `Usuario creado, pero Supabase no pudo enviar el email: ${this.getErrorMessage(error)}`,
         };
       }
     }

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CreateOtoEvaluacionDto } from './dto/create-oto-evaluacion.dto';
+import { CreateOtoEvaluationDto } from './dto/create-oto-evaluation.dto';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
@@ -14,14 +14,29 @@ export class OtoService {
     async getConfig() {
         const config = await this.supabaseDataService.getOtoConfig();
 
-        if (!config || !config.secciones) {
+        const rawSections = config?.sections ?? config?.secciones;
+        if (!rawSections) {
             throw new NotFoundException(
                 'No se encontró configuración de one-to-one en Supabase. ' +
                 'Ejecuta POST /oto/seed para cargar la configuración inicial.'
             );
         }
 
-        return { secciones: config.secciones };
+        const sections = (rawSections as any[]).map((section) => ({
+            id: section.id,
+            name: section.name,
+            type: section.type ?? section.tipo,
+            questions: (section.questions ?? section.preguntas ?? []).map((question: any) => ({
+                key: question.key ?? question.clave,
+                label: question.label,
+                options: (question.options ?? question.opciones ?? []).map((option: any) => ({
+                    value: option.value ?? option.valor,
+                    description: option.description ?? option.descripcion,
+                })),
+            })),
+        }));
+
+        return { sections };
     }
 
     /**
@@ -29,26 +44,26 @@ export class OtoService {
      * Solo necesita ejecutarse una vez.
      */
     async seedConfig() {
-        const secciones = [
+        const sections = [
             {
-                id: 'preguntasReflexion',
-                nombre: 'Preguntas de Reflexión',
-                tipo: 'texto_libre',
-                preguntas: [
-                    { clave: 'cargaTrabajo', label: '¿Cómo te sientes con tu carga de trabajo?' },
-                    { clave: 'apoyoLider', label: '¿Hay algo que pueda hacer para apoyarte mejor?' },
-                    { clave: 'retosRol', label: '¿Qué retos estás enfrentando en tu rol?' },
-                    { clave: 'procesosEquipo', label: '¿Cómo podemos mejorar los procesos o las dinámicas del equipo?' },
-                    { clave: 'feedbackLider', label: '¿Tienes algún feedback para mí como líder?' },
+                id: 'reflectionQuestions',
+                name: 'Preguntas de Reflexión',
+                type: 'free_text',
+                questions: [
+                    { key: 'cargaTrabajo', label: '¿Cómo te sientes con tu carga de trabajo?' },
+                    { key: 'apoyoLider', label: '¿Hay algo que pueda hacer para apoyarte mejor?' },
+                    { key: 'retosRol', label: '¿Qué retos estás enfrentando en tu rol?' },
+                    { key: 'procesosEquipo', label: '¿Cómo podemos mejorar los procesos o las dinámicas del equipo?' },
+                    { key: 'feedbackLider', label: '¿Tienes algún feedback para mí como líder?' },
                 ],
             },
             {
-                id: 'habilidadesBlandas',
-                nombre: 'Habilidades Blandas',
-                tipo: 'calificacion_con_opciones',
-                preguntas: [
+                id: 'softSkills',
+                name: 'Habilidades Blandas',
+                type: 'rating_with_options',
+                questions: [
                     {
-                        clave: 'trabajoEquipo',
+                        key: 'trabajoEquipo',
                         label: 'Trabajo en equipo',
                         opciones: [
                             { valor: 1, descripcion: 'No colabora en equipo.' },
@@ -57,7 +72,7 @@ export class OtoService {
                         ],
                     },
                     {
-                        clave: 'comunicacionEfectiva',
+                        key: 'comunicacionEfectiva',
                         label: 'Comunicación efectiva',
                         opciones: [
                             { valor: 1, descripcion: 'No se comunica con claridad.' },
@@ -66,7 +81,7 @@ export class OtoService {
                         ],
                     },
                     {
-                        clave: 'proactividad',
+                        key: 'proactividad',
                         label: 'Proactividad',
                         opciones: [
                             { valor: 1, descripcion: 'Espera instrucciones para actuar.' },
@@ -75,7 +90,7 @@ export class OtoService {
                         ],
                     },
                     {
-                        clave: 'resolucionProblemas',
+                        key: 'resolucionProblemas',
                         label: 'Resolución de problemas',
                         opciones: [
                             { valor: 1, descripcion: 'Tiene dificultades para encontrar soluciones.' },
@@ -84,7 +99,7 @@ export class OtoService {
                         ],
                     },
                     {
-                        clave: 'capacidadAprendizaje',
+                        key: 'capacidadAprendizaje',
                         label: 'Capacidad de aprendizaje',
                         opciones: [
                             { valor: 1, descripcion: 'Le cuesta aprender y adaptarse.' },
@@ -95,33 +110,33 @@ export class OtoService {
                 ],
             },
             {
-                id: 'sintesisFinal',
-                nombre: 'Síntesis Final',
-                tipo: 'texto_libre',
-                preguntas: [
-                    { clave: 'oportunidadesMejora', label: 'Áreas de mejora:' },
-                    { clave: 'recomendaciones', label: 'Recomendaciones:' },
-                    { clave: 'fortalezas', label: 'Fortalezas:' },
-                    { clave: 'inquietudes', label: 'Inquietudes:' },
-                    { clave: 'sugerencias', label: 'Sugerencias:' },
-                    { clave: 'objetivosProxPeriodo', label: 'Objetivos para el próximo periodo:' },
+                id: 'finalSummary',
+                name: 'Síntesis Final',
+                type: 'free_text',
+                questions: [
+                    { key: 'oportunidadesMejora', label: 'Áreas de mejora:' },
+                    { key: 'recomendaciones', label: 'Recomendaciones:' },
+                    { key: 'fortalezas', label: 'Fortalezas:' },
+                    { key: 'inquietudes', label: 'Inquietudes:' },
+                    { key: 'sugerencias', label: 'Sugerencias:' },
+                    { key: 'objetivosProxPeriodo', label: 'Objetivos para el próximo periodo:' },
                 ],
             },
         ];
 
         await this.supabaseDataService.saveOtoConfig({
-            secciones,
-            fechaActualizacion: new Date().toISOString(),
+            sections,
+            updatedAt: new Date().toISOString(),
         });
 
         return { ok: true, message: 'Configuración de one-to-one importada a Supabase exitosamente' };
     }
 
-    async save(data: CreateOtoEvaluacionDto) {
-        return this.supabaseDataService.saveOtoEvaluacion(data);
+    async save(data: CreateOtoEvaluationDto) {
+        return this.supabaseDataService.saveOtoEvaluation(data);
     }
 
-    async getHistorial(equipoId: string) {
-        return this.supabaseDataService.getOtoHistorial(equipoId);
+    async getHistory(teamId: string) {
+        return this.supabaseDataService.getOtoHistory(teamId);
     }
 }
