@@ -11,7 +11,8 @@ async function bootstrap() {
 
   app.enableCors({
     origin: ['http://localhost:4200', 'https://bluecore-portal-gestion-prod.web.app'], // URL frontend
-    methods: 'GET,POST',
+    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
 
@@ -29,6 +30,7 @@ async function bootstrap() {
     .setTitle('APIs de Portal de Gestión')
     .setDescription('Documentación de los endpoints')
     .setVersion('1.0')
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

@@ -2,30 +2,34 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PersonalModule } from './personal/personal.module';
-import { EquiposModule } from './equipos/equipos.module';
-import { RotacionHistorialModule } from './rotacion-historial/rotacion-historial.module';
-import { ModulosSidebarModule } from './modulos-sidebar/modulos-sidebar.module';
-import { OperacionesModule } from './operaciones/operaciones.module';
-import { RotacionModule } from './rotacion/rotacion.module';
+import { PersonnelModule } from './personnel/personnel.module';
+import { TeamsModule } from './teams/teams.module';
+import { RotationHistoryModule } from './rotation-history/rotation-history.module';
+import { SidebarModulesModule } from './sidebar-modules/sidebar-modules.module';
+import { OperationsModule } from './operations/operations.module';
+import { RotationModule } from './rotation/rotation.module';
 import { OtoModule } from './oto/oto.module';
 import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
+import { SupabaseModule } from './supabase/supabase.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    PersonalModule,
-    EquiposModule,
-    RotacionHistorialModule,
-    ModulosSidebarModule,
-    OperacionesModule,
-    RotacionModule,
+    PersonnelModule,
+    TeamsModule,
+    RotationHistoryModule,
+    SidebarModulesModule,
+    OperationsModule,
+    RotationModule,
     OtoModule,
     PerformanceModule,
     MaintenanceModule,
+    SupabaseModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

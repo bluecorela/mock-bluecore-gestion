@@ -1,0 +1,91 @@
+import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
+import { PersonnelService } from './personnel.service';
+import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { CreatePersonnelDto } from './dto/create-personnel.dto';
+
+@ApiTags('Personal')
+@Controller('personnel')
+export class PersonnelController {
+  constructor(private readonly personnelService: PersonnelService) { }
+
+  @Post()
+  @ApiOperation({ summary: 'Crear un nuevo miembro del personal' })
+  @ApiResponse({ status: 201, description: 'Miembro creado exitosamente' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o validación de negocio fallida' })
+  async create(@Body() createPersonnelDto: CreatePersonnelDto) {
+    return await this.personnelService.create(createPersonnelDto);
+  }
+
+  @Get()
+  @ApiOperation({ summary: 'Obtener información del usuario' })
+  @ApiQuery({
+    name: 'email',
+    required: true,
+    type: String,
+    example: 'ccharpentier@bluecorela.com',
+    description: 'Correo del usuario',
+  })
+
+  @ApiResponse({ status: 200, description: 'Usuario encontrado' })
+  @ApiResponse({ status: 400, description: 'El correo del usuario es obligatorio' })
+  @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
+
+  async find(@Query('email') email?: string) {
+
+    if (!email) {
+      throw new BadRequestException('El parámetro "correo" es obligatorio');
+    }
+    const personnel = await this.personnelService.findOne(email);
+
+    if (!personnel) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    return personnel;
+  }
+  @Get('team')
+  @ApiOperation({ summary: 'Obtener personal por equipo' })
+  @ApiQuery({
+    name: 'teamId',
+    required: true,
+    type: String,
+    example: 'sgb-evolucion',
+    description: 'ID del equipo',
+  })
+  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado (puede ser un array vacío)' })
+  @ApiResponse({ status: 400, description: 'El ID del equipo es obligatorio' })
+
+  async findByTeam(@Query('teamId') teamId?: string) {
+    if (!teamId) {
+      throw new BadRequestException('El parámetro "equipoId" es obligatorio');
+    }
+    const personnel = await this.personnelService.findByTeam(teamId);
+
+    // Retornar array vacío si no hay personal, en lugar de 404
+    return personnel || [];
+  }
+
+  @Get('vacations')
+  @ApiOperation({ summary: 'Obtener personal actualmente en vacaciones' })
+  @ApiResponse({ status: 200, description: 'Lista de personal en vacaciones' })
+  async getVacationingPersonnel() {
+    return await this.personnelService.getVacationingPersonnel();
+  }
+
+  @Get('all')
+  @ApiOperation({ summary: 'Obtener todo el personal' })
+  @ApiResponse({ status: 200, description: 'Lista de todo el personal' })
+  @ApiResponse({ status: 500, description: 'Error interno del servidor' })
+  @ApiResponse({ status: 404, description: 'No se encontró personal' })
+  async findAll() {
+
+    const personnel = await this.personnelService.findAll();
+
+    if (!personnel) {
+      throw new NotFoundException('No se encontró personal');
+    }
+
+    return personnel;
+
+  }
+}

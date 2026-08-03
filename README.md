@@ -1,27 +1,34 @@
-# Mock Bluecore Gestion
+# Mock Bluecore Gestión — Backend API
 
-A NestJS-based backend API for managing teams, personnel, and rotation history, integrated with Firebase for data storage and authentication.
+API backend construida con NestJS para el portal de gestión interna de Bluecore. Gestiona equipos, personal, evaluaciones de desempeño, sesiones One to One, rotaciones y métricas de rendimiento, integrado con Supabase/PostgreSQL como base de datos.
 
 ## Features
 
-- **Authentication**: Secure user authentication module.
-- **Teams Management**: CRUD operations for managing teams (equipos).
-- **Personnel Management**: Manage personnel data and assignments.
-- **Rotation History**: Track and manage historical rotations.
-- **Firebase Integration**: Uses Firebase for database and client services.
+- **Teams Management**: CRUD de equipos, sprints, integrantes y dashboard consolidado con métricas de rendimiento.
+- **Personnel Management**: Gestión de personal, asignación a equipos, control de vacaciones y reemplazos.
+- **Sprint Evaluation**: Registro de evaluaciones por sprint con auto-cierre cuando todos los integrantes han sido evaluados.
+- **Performance Evaluation**: Evaluaciones de desempeño con habilitación por Admin, historial por periodo y configuración dinámica de preguntas.
+- **One to One (OTO)**: Sesiones individuales cada 4 sprints con configuración dinámica, historial y exportación.
+- **Rotation Management**: Control de rotaciones entre equipos con historial completo.
+- **Operations Engine**: Cálculo centralizado de promedios de rendimiento, tendencias y calificaciones por sprint.
+- **Dynamic Sidebar**: Módulos de navegación controlados por rol desde Supabase.
+- **Maintenance Mode**: Endpoint para activar/desactivar modo mantenimiento global.
+- **Supabase Integration**: PostgreSQL como base de datos y Supabase Data API para acceso desde el backend.
+- **Migration Utilities**: Scripts para exportar Firestore y preparar/importar datos hacia Supabase.
 
 ## Prerequisites
 
 - Node.js (version 18 or higher)
 - npm or yarn
-- Firebase project setup (for Firebase integration)
+- Supabase project with Data API enabled
+- Supabase secret/service role key for backend access
 
 ## Installation
 
 1. Clone the repository:
    ```bash
    git clone <repository-url>
-   cd mock_bluecore_gestion
+   cd mock-bluecore-gestion
    ```
 
 2. Install dependencies:
@@ -30,8 +37,13 @@ A NestJS-based backend API for managing teams, personnel, and rotation history, 
    ```
 
 3. Set up environment variables:
-   Create a `.env` file in the root directory and configure your Firebase credentials and other necessary variables.
+   Create a `.env` file in the root directory and configure your Supabase credentials and other necessary variables.
 
+   EXAMPLE:
+```
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your_secret_or_service_role_key
+```
 ## Running the Application
 
 ```bash
@@ -83,31 +95,88 @@ npm run format
 
 The API provides endpoints for:
 
-- `/auth` - Authentication routes
-- `/equipos` - Teams management
-- `/personal` - Personnel management
-- `/historial-rotaciones` - Rotation history
+- **Teams (`/equipos`, legacy-compatible route)**
+- **Personnel (`/personal`, legacy-compatible route)**
+- **Performance (/performance)**
+- **One to One (/oto)**
+- **Rotation (`/rotacion`, legacy-compatible route)**
+- **Rotation History (`/rotacion-historial`, legacy-compatible route)**
+- **Sidebar Modules (`/modulos-sidebar`, legacy-compatible route)**
+- **Maintenance (/maintenance)**
 
-For detailed API documentation, refer to the Swagger/OpenAPI specs if available, or check the controller files in the `src/` directory.
+For detailed API documentation and testing, refer to the Swagger/OpenAPI specs if available, or check the controller files in the `src/` directory.
+
+Swagger URL: https://bluecore-gestion-api.bluecorela.com/api/Docs#
 
 ## Project Structure
 
 ```
 src/
-├── app.controller.ts
-├── app.module.ts
-├── app.service.ts
-├── auth/
-├── equipos/
+├── main.ts                    # Entry point & CORS configuration
+├── app.module.ts              # Root module
+├── app.controller.ts          # Health check
+├── app.service.ts             # Base service
+├── supabase/
+│   ├── supabase.client.ts     # Supabase client wrapper
+│   ├── supabase-data.service.ts # Data access layer
+│   └── interfaces/
 ├── firebase/
-├── historial-rotaciones/
-├── interfaces/
-├── main.ts
-└── personal/
-test/
-├── app.e2e-spec.ts
-└── jest-e2e.json
+│   └── firebase.client.ts     # Legacy Firebase client kept for migration reference
+├── teams/
+│   ├── teams.controller.ts  # Teams & Sprints endpoints
+│   ├── teams.service.ts     # Dashboard, metrics & evaluation logic
+│   ├── teams.module.ts
+│   └── dto/
+├── personnel/
+│   ├── personnel.controller.ts # Personnel endpoints
+│   ├── personnel.service.ts
+│   ├── personnel.module.ts
+│   └── dto/
+├── performance/
+│   ├── performance.controller.ts  # Performance evaluation endpoints
+│   ├── performance.service.ts     # Evaluation & enablement logic
+│   ├── performance.module.ts
+│   └── dto/
+├── oto/
+│   ├── oto.controller.ts      # One to One endpoints
+│   ├── oto.service.ts         # OTO calculation & history logic
+│   ├── oto.module.ts
+│   └── dto/
+├── operations/
+│   └── operations.service.ts # Centralized performance calculations
+├── rotation/
+│   ├── rotation.controller.ts
+│   ├── rotation.service.ts
+│   └── rotation.module.ts
+├── rotation-history/
+│   ├── rotation-history.controller.ts
+│   ├── rotation-history.service.ts
+│   └── rotation-history.module.ts
+├── sidebar-modules/
+│   ├── sidebar-modules.controller.ts
+│   ├── sidebar-modules.service.ts
+│   └── sidebar-modules.module.ts
+└── maintenance/
+    ├── maintenance.controller.ts
+    ├── maintenance.service.ts
+    └── maintenance.module.ts
+
 ```
+## Key Business Logic
+
+Performance Metrics (Cuadro de Sprints)
+The scoring formula for sprint evaluations is calculated on the frontend and stored via the API:
+
+Total Final = (Entregadas/Asignadas) × 0.4 + (Netas/Entregadas) × 0.4 + (Calidad/4) × 0.2
+
+Migration Scripts
+
+```bash
+npm run firebase:export
+npm run supabase:prepare
+npm run supabase:check
+```
+
 
 ## Contributing
 

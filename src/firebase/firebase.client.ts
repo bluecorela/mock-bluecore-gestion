@@ -3,14 +3,14 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore, collection, getDocs, query, where, doc, getDoc, setDoc, limit } from 'firebase/firestore';
 
-export interface ResumenIntegrante {
-  nombre: string;
+export interface MemberSummary {
+  name: string;
   total1: number;
   total2: number;
   total3: number;
   total_final: number;
-  calificacion: string;
-  comentarios?: string;
+  rating: string;
+  comments?: string;
 }
 @Injectable()
 export class FirebaseClient {
@@ -65,11 +65,11 @@ export class FirebaseClient {
     }
   }
 
-  async getPersonalByEmail(email: string) {
+  async getPersonnelByEmail(email: string) {
     await this.login();
 
-    const personalRef = collection(this.db, 'personal');
-    const q = query(personalRef, where('correo', '==', email));
+    const personnelRef = collection(this.db, 'personal');
+    const q = query(personnelRef, where('correo', '==', email));
     const snap = await getDocs(q);
 
     if (snap.empty) return null;
@@ -78,20 +78,20 @@ export class FirebaseClient {
     return { id: doc.id, ...doc.data() };
   }
 
-  async getPersonalById(id: string) {
+  async getPersonnelById(id: string) {
     await this.login();
-    const personalRef = doc(this.db, 'personal', id);
-    const personalSnap = await getDoc(personalRef);
+    const personnelRef = doc(this.db, 'personal', id);
+    const personnelSnapshot = await getDoc(personnelRef);
 
-    if (!personalSnap.exists()) return null;
-    return { id: personalSnap.id, ...personalSnap.data() };
+    if (!personnelSnapshot.exists()) return null;
+    return { id: personnelSnapshot.id, ...personnelSnapshot.data() };
   }
 
-  async getPersonal() {
+  async getPersonnel() {
     await this.login();
 
-    const personalRef = collection(this.db, 'personal');
-    const snap = await getDocs(personalRef);
+    const personnelRef = collection(this.db, 'personal');
+    const snap = await getDocs(personnelRef);
 
     return snap.docs.map(docu => ({
       id: docu.id,
@@ -101,15 +101,15 @@ export class FirebaseClient {
   }
 
 
-  async getPersonalByEquipo(equipoId: string) {
+  async getPersonnelByTeam(teamId: string) {
     await this.login();
 
-    const equipoRef = doc(this.db, 'equipos', equipoId);
-    const personalRef = collection(this.db, 'personal');
+    const teamRef = doc(this.db, 'equipos', teamId);
+    const personnelRef = collection(this.db, 'personal');
 
     const q = query(
-      personalRef,
-      where('equipo', '==', equipoRef)
+      personnelRef,
+      where('equipo', '==', teamRef)
     );
 
     const snap = await getDocs(q);
@@ -120,11 +120,11 @@ export class FirebaseClient {
     }));
   }
 
-  async getPersonalOnVacation() {
+  async getVacationingPersonnel() {
     await this.login();
 
-    const personalRef = collection(this.db, 'personal');
-    const q = query(personalRef, where('vacaciones', '==', true));
+    const personnelRef = collection(this.db, 'personal');
+    const q = query(personnelRef, where('vacaciones', '==', true));
     const snap = await getDocs(q);
 
     return snap.docs.map(docu => ({
@@ -133,46 +133,46 @@ export class FirebaseClient {
     }));
   }
 
-  async getEquipos(onlyWithEvaluations = false) {
+  async getTeams(onlyWithEvaluations = false) {
     await this.login();
-    const equiposRef = collection(this.db, 'equipos');
-    const equiposSnap = await getDocs(equiposRef);
-    let equiposDisponibles = equiposSnap.docs.map(doc => ({
+    const teamsRef = collection(this.db, 'equipos');
+    const teamsSnapshot = await getDocs(teamsRef);
+    let availableTeams = teamsSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     }));
 
     if (onlyWithEvaluations) {
       const filtered: any[] = [];
-      for (const equipo of equiposDisponibles) {
+      for (const team of availableTeams) {
         // Verificar si tiene al menos un sprint con integrantes evaluados
-        const sprintsRef = collection(this.db, 'equipos', equipo.id, 'sprints');
+        const sprintsRef = collection(this.db, 'equipos', team.id, 'sprints');
         const sprintsSnap = await getDocs(sprintsRef);
 
         let hasEvaluations = false;
         for (const sprintDoc of sprintsSnap.docs) {
-          const integrantesRef = collection(this.db, 'equipos', equipo.id, 'sprints', sprintDoc.id, 'Integrantes');
-          const integrantesSnap = await getDocs(query(integrantesRef, limit(1)));
-          if (!integrantesSnap.empty) {
+          const membersRef = collection(this.db, 'equipos', team.id, 'sprints', sprintDoc.id, 'Integrantes');
+          const membersSnapshot = await getDocs(query(membersRef, limit(1)));
+          if (!membersSnapshot.empty) {
             hasEvaluations = true;
             break;
           }
         }
 
         if (hasEvaluations) {
-          filtered.push(equipo);
+          filtered.push(team);
         }
       }
       return filtered;
     }
 
-    return equiposDisponibles;
+    return availableTeams;
   }
 
-  async searchTeamByName(name: string) {
+  async findTeamByName(name: string) {
     await this.login();
-    const equiposRef = collection(this.db, 'equipos');
-    const q = query(equiposRef, where('nombre', '==', name));
+    const teamsRef = collection(this.db, 'equipos');
+    const q = query(teamsRef, where('nombre', '==', name));
     const snap = await getDocs(q);
 
     if (snap.empty) return null;
@@ -180,19 +180,19 @@ export class FirebaseClient {
     const doc = snap.docs[0];
     return { id: doc.id, ...doc.data() };
   }
-  async getEquipo(equipoId: string) {
+  async getTeam(teamId: string) {
     await this.login();
-    const equipoRef = doc(this.db, `equipos/${equipoId}`);
-    const equipoSnap = await getDoc(equipoRef);
-    if (!equipoSnap.exists()) {
+    const teamRef = doc(this.db, `teams/${teamId}`);
+    const teamSnapshot = await getDoc(teamRef);
+    if (!teamSnapshot.exists()) {
       return null;
     }
-    return { id: equipoSnap.id, ...equipoSnap.data() };
+    return { id: teamSnapshot.id, ...teamSnapshot.data() };
   }
 
-  async getSprintsByEquipo(equipoId: string) {
+  async getSprintsByTeam(teamId: string) {
     await this.login();
-    const sprintsRef = collection(this.db, `equipos/${equipoId}/sprints`);
+    const sprintsRef = collection(this.db, `teams/${teamId}/sprints`);
     const sprintsSnap = await getDocs(sprintsRef);
     const sprintsData = sprintsSnap.docs.map(doc => ({
       id: doc.id,
@@ -201,28 +201,28 @@ export class FirebaseClient {
     return sprintsData;
   }
 
-  async getIntegrantesBySprint(
-    equipoId: string,
+  async getMembersBySprint(
+    teamId: string,
     sprintId: string
-  ): Promise<(ResumenIntegrante & { id: string })[]> {
+  ): Promise<(MemberSummary & { id: string })[]> {
     await this.login();
 
-    const integrantesRef = collection(
+    const membersRef = collection(
       this.db,
-      `equipos/${equipoId}/sprints/${sprintId}/Integrantes`
+      `teams/${teamId}/sprints/${sprintId}/Integrantes`
     );
 
-    const integrantesSnap = await getDocs(integrantesRef);
+    const membersSnapshot = await getDocs(membersRef);
 
-    return integrantesSnap.docs.map(doc => ({
+    return membersSnapshot.docs.map(doc => ({
       id: doc.id,
-      ...(doc.data() as ResumenIntegrante),
+      ...(doc.data() as MemberSummary),
     }));
   }
 
-  async getSprint(equipoId: string, sprintId: string) {
+  async getSprint(teamId: string, sprintId: string) {
     await this.login();
-    const sprintRef = doc(this.db, `equipos/${equipoId}/sprints/${sprintId}`);
+    const sprintRef = doc(this.db, `teams/${teamId}/sprints/${sprintId}`);
     const sprintSnap = await getDoc(sprintRef);
     if (!sprintSnap.exists()) {
       return null;
@@ -235,15 +235,15 @@ export class FirebaseClient {
       fecha_fin: sprintSnap.data().fecha_fin
         ? sprintSnap.data().fecha_fin.toDate().toISOString()
         : null,
-      sprintCerrado: sprintSnap.data().sprint_cerrado ?? null
+      sprintClosed: sprintSnap.data().sprint_cerrado ?? null
     };
   }
 
-  async getSprintEvaluationStatus(equipoId: string, specificSprintId?: string) {
+  async getSprintEvaluationStatus(teamId: string, specificSprintId?: string) {
     await this.login();
 
     // 1. Obtener todos los sprints del equipo para encontrar el activo
-    const sprints = await this.getSprintsByEquipo(equipoId);
+    const sprints = await this.getSprintsByTeam(teamId);
 
     let activeSprint: any = null;
 
@@ -258,49 +258,49 @@ export class FirebaseClient {
 
     // Si no hay sprint activo pendiente, calculamos el "sprint + 1" del máximo existente
     const maxSprintNum = sprints.reduce((max, s) => Math.max(max, this.getSprintNumero(s.id)), 0);
-    const sprintNumero = activeSprint ? this.getSprintNumero(activeSprint.id) : (maxSprintNum + 1);
-    const sprintId = activeSprint ? activeSprint.id : `sprint-${sprintNumero}`;
+    const sprintNumber = activeSprint ? this.getSprintNumero(activeSprint.id) : (maxSprintNum + 1);
+    const sprintId = activeSprint ? activeSprint.id : `sprint-${sprintNumber}`;
 
     // 2. Obtener integrantes ya evaluados en este sprint
-    const evaluadosRaw = await this.getIntegrantesBySprint(equipoId, sprintId);
-    const evaluadosNombres = evaluadosRaw.map(e => e.nombre.toLowerCase().trim());
+    const rawEvaluatedMembers = await this.getMembersBySprint(teamId, sprintId);
+    const evaluatedNames = rawEvaluatedMembers.map(e => e.name.toLowerCase().trim());
 
     // 3. Obtener personal del equipo (base para pendientes)
-    const personal = await this.getPersonalByEquipo(equipoId);
+    const personnel = await this.getPersonnelByTeam(teamId);
 
     // 4. Filtrar pendientes con la lógica de negocio completa
-    const integrantesEquipo = personal
+    const teamMembers = personnel
       .filter(p => {
-        const rol = String(p['rol'] || '').toLowerCase().trim();
-        const vacaciones = p['vacaciones'] === true;
-        const nombre = String(p['nombre'] || '').toLowerCase().trim();
+        const role = String(p['rol'] || '').toLowerCase().trim();
+        const onVacation = p['vacaciones'] === true;
+        const name = String(p['nombre'] || '').toLowerCase().trim();
 
         // No evaluados aún
-        const yaEvaluado = evaluadosNombres.includes(nombre);
+        const alreadyEvaluated = evaluatedNames.includes(name);
 
         // Reglas de exclusión
-        const esArquitecto = rol === 'arquitecto';
+        const isArchitect = role === 'arquitecto';
 
         // Regla de reemplazo (inicioReemplazoSprintId)
-        const inicioReemplazo = p['inicioReemplazoSprintId']
+        const replacementStart = p['inicioReemplazoSprintId']
           ? this.getSprintNumero(p['inicioReemplazoSprintId'])
           : 0;
-        const habilitadoPorReemplazo = inicioReemplazo <= sprintNumero;
+        const enabledByReplacement = replacementStart <= sprintNumber;
 
-        return !yaEvaluado && !esArquitecto && !vacaciones && habilitadoPorReemplazo;
+        return !alreadyEvaluated && !isArchitect && !onVacation && enabledByReplacement;
       })
       .map(p => ({
-        nombre: p['nombre'],
-        rol: p['rol'],
-        vacaciones: p['vacaciones'] ?? false,
-        inicioReemplazoSprintId: p['inicioReemplazoSprintId'] ?? null
+        name: p['nombre'],
+        role: p['rol'],
+        onVacation: p['vacaciones'] ?? false,
+        replacementStartSprintId: p['inicioReemplazoSprintId'] ?? null
       }));
 
     // 5. Fechas del sprint (si ya existe) en formato ISO para el input date del front
-    let fechas = { fechaInicio: '', fechaFin: '' };
+    let dates = { startDate: '', endDate: '' };
     if (activeSprint) {
-      fechas.fechaInicio = activeSprint.fecha_inicio ? new Date(activeSprint.fecha_inicio.seconds * 1000).toISOString().split('T')[0] : '';
-      fechas.fechaFin = activeSprint.fecha_fin ? new Date(activeSprint.fecha_fin.seconds * 1000).toISOString().split('T')[0] : '';
+      dates.startDate = activeSprint.fecha_inicio ? new Date(activeSprint.fecha_inicio.seconds * 1000).toISOString().split('T')[0] : '';
+      dates.endDate = activeSprint.fecha_fin ? new Date(activeSprint.fecha_fin.seconds * 1000).toISOString().split('T')[0] : '';
     } else {
       // Sugerir fechas de la semana actual si es un sprint nuevo
       const hoy = new Date();
@@ -311,17 +311,17 @@ export class FirebaseClient {
       const viernes = new Date(lunes);
       viernes.setDate(lunes.getDate() + 4);
 
-      fechas.fechaInicio = lunes.toISOString().split('T')[0];
-      fechas.fechaFin = viernes.toISOString().split('T')[0];
+      dates.startDate = lunes.toISOString().split('T')[0];
+      dates.endDate = viernes.toISOString().split('T')[0];
     }
 
     return {
       sprintId,
-      sprintNumero,
-      integrantesEquipo,
-      fechas,
-      fechasGuardadas: !!activeSprint, // Flag to indicate if we are in an already created sprint
-      sprintCerrado: activeSprint ? (activeSprint.sprint_cerrado === true) : false
+      sprintNumber,
+      teamMembers,
+      dates,
+      datesSaved: !!activeSprint, // Flag to indicate if we are in an already created sprint
+      sprintClosed: activeSprint ? (activeSprint.sprint_cerrado === true) : false
     };
   }
 
@@ -330,77 +330,77 @@ export class FirebaseClient {
     return parts.length > 1 ? parseInt(parts[1], 10) : 0;
   }
 
-  async getHistorialRotaciones() {
+  async getRotationHistory() {
     await this.login();
-    const historialRef = collection(this.db, 'historialRotaciones');
-    const historialSnap = await getDocs(historialRef);
+    const historyRef = collection(this.db, 'historialRotaciones');
+    const historySnapshot = await getDocs(historyRef);
 
-    const historialData = historialSnap.docs.map(doc => ({
+    const historyData = historySnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data(),
     }));
-    return historialData;
+    return historyData;
   }
 
-  async getModulosRol(rol: string) {
+  async getModulesByRole(role: string) {
     await this.login();
-    const modulosRef = collection(this.db, 'modulosSidebar');
-    const modulosSnap = await getDocs(modulosRef);
-    const modulosData = modulosSnap.docs
+    const modulesRef = collection(this.db, 'modulosSidebar');
+    const modulesSnapshot = await getDocs(modulesRef);
+    const modulesData = modulesSnapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter((modulo: any) => Array.isArray(modulo.rolesPermitidos) &&
-        modulo.rolesPermitidos.includes(rol));
+      .filter((moduleItem: any) => Array.isArray(moduleItem.allowedRoles) &&
+        moduleItem.allowedRoles.includes(role));
 
     // Si el rol es Admin, filtrar los módulos que no deben mostrarse por ahora
-    if (rol === 'Admin') {
-      const modulosADeshabilitar = ['Gestor de Noticias', 'Documentos'];
-      return modulosData.filter((m: any) => !modulosADeshabilitar.includes(m.nombre));
+    if (role === 'Admin') {
+      const modulesToDisable = ['Gestor de Noticias', 'Documentos'];
+      return modulesData.filter((m: any) => !modulesToDisable.includes(m.name));
     }
 
-    return modulosData;
+    return modulesData;
   }
 
-  async guardarEvaluacion(data: any) {
+  async saveEvaluation(data: any) {
     await this.login();
 
     const {
-      equipoId,
+      teamId,
       sprintId,
-      fechaInicio,
-      fechaFin,
-      ingeniero,
-      metricas,
-      puntuacionFinal,
-      calificacionTexto,
-      comentarios,
-      evaluadorCorreo,
+      startDate,
+      endDate,
+      engineer,
+      metrics,
+      finalScore,
+      ratingLabel,
+      comments,
+      evaluatorEmail,
     } = data;
 
-    const nombreIngeniero = ingeniero.split(' – ')[0];
-    const integranteId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+    const engineerName = engineer.split(' – ')[0];
+    const memberId = engineerName.toLowerCase().replace(/\s/g, '-');
 
-    const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
+    const sprintRef = doc(this.db, 'equipos', teamId, 'sprints', sprintId);
     const sprintSnap = await getDoc(sprintRef);
 
     if (!sprintSnap.exists()) {
       await setDoc(sprintRef, {
-        fecha_inicio: new Date(fechaInicio),
-        fecha_fin: new Date(fechaFin),
+        fecha_inicio: new Date(startDate),
+        fecha_fin: new Date(endDate),
         sprint_cerrado: false,
       });
     }
 
-    const integranteRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId, 'Integrantes', integranteId);
+    const memberRef = doc(this.db, 'equipos', teamId, 'sprints', sprintId, 'Integrantes', memberId);
 
     await setDoc(
-      integranteRef,
+      memberRef,
       {
-        nombre: nombreIngeniero,
-        ...metricas,
-        total_final: puntuacionFinal,
-        calificacion: calificacionTexto,
-        comentarios,
-        evaluado_por: evaluadorCorreo,
+        name: engineerName,
+        ...metrics,
+        total_final: finalScore,
+        rating: ratingLabel,
+        comments,
+        evaluado_por: evaluatorEmail,
         fecha_evaluacion: new Date(),
       },
       { merge: true }
@@ -409,35 +409,35 @@ export class FirebaseClient {
     // ────────────────────────────────────────────────────────────────
     // Auto-cerrar sprint si ya se evaluaron todos los integrantes
     // ────────────────────────────────────────────────────────────────
-    const integrantesRef = collection(this.db, 'equipos', equipoId, 'sprints', sprintId, 'Integrantes');
-    const integrantesSnap = await getDocs(integrantesRef);
-    const totalEvaluados = integrantesSnap.size;
+    const membersRef = collection(this.db, 'equipos', teamId, 'sprints', sprintId, 'Integrantes');
+    const membersSnapshot = await getDocs(membersRef);
+    const totalEvaluated = membersSnapshot.size;
 
     // Calcular miembros esperados: personal del equipo excluye Arquitecto y vacaciones
-    const equipoDocRef = doc(this.db, 'equipos', equipoId);
-    const personalRef = collection(this.db, 'personal');
-    const personalSnap = await getDocs(
-      query(personalRef, where('equipo', '==', equipoDocRef))
+    const teamDocumentRef = doc(this.db, 'equipos', teamId);
+    const personnelRef = collection(this.db, 'personal');
+    const personnelSnapshot = await getDocs(
+      query(personnelRef, where('equipo', '==', teamDocumentRef))
     );
 
-    const totalEsperados = personalSnap.docs
+    const totalExpected = personnelSnapshot.docs
       .map(d => d.data())
       .filter(p => {
-        const rol = String(p['rol'] || '').toLowerCase().trim();
-        const vacaciones = p['vacaciones'] === true;
-        return rol !== 'arquitecto' && !vacaciones;
+        const role = String(p['rol'] || '').toLowerCase().trim();
+        const onVacation = p['vacaciones'] === true;
+        return role !== 'arquitecto' && !onVacation;
       }).length;
 
-    let sprintCerrado = false;
-    if (totalEsperados > 0 && totalEvaluados >= totalEsperados) {
+    let sprintClosed = false;
+    if (totalExpected > 0 && totalEvaluated >= totalExpected) {
       await setDoc(sprintRef, { sprint_cerrado: true }, { merge: true });
-      sprintCerrado = true;
+      sprintClosed = true;
     }
 
     // Retornar el nuevo estado para que el front se actualice automáticamente
-    const nextState = await this.getSprintEvaluationStatus(equipoId);
+    const nextState = await this.getSprintEvaluationStatus(teamId);
 
-    return { ok: true, sprintCerrado, nextState };
+    return { ok: true, sprintClosed, nextState };
   }
 
 
@@ -457,82 +457,82 @@ export class FirebaseClient {
     });
   }
 
-  async obtenerMetricas(equipoId: string, sprintId: string) {
+  async getMetrics(teamId: string, sprintId: string) {
     await this.login();
 
-    const integrantes = await this.getIntegrantesBySprint(equipoId, sprintId);
+    const members = await this.getMembersBySprint(teamId, sprintId);
 
-    const sprintRef = doc(this.db, 'equipos', equipoId, 'sprints', sprintId);
+    const sprintRef = doc(this.db, 'equipos', teamId, 'sprints', sprintId);
     const sprintSnap = await getDoc(sprintRef);
     const sprintData = sprintSnap.data();
 
-    const resumen = integrantes
-      .filter(i => i.calificacion !== 'Arquitecto')
+    const summary = members
+      .filter(i => i.rating !== 'Arquitecto')
       .map(i => ({
-        nombre: i.nombre,
+        name: i.name,
         total1: i.total1,
         total2: i.total2,
         total3: i.total3,
-        totalFinal: `${i.total_final}% (${i.calificacion})`,
-        comentarios: i.comentarios ?? '—',
+        totalFinal: `${i.total_final}% (${i.rating})`,
+        comments: i.comments ?? '—',
       }));
 
     return {
-      fechaInicio: this.formatDate(sprintData?.fecha_inicio),
-      fechaFin: this.formatDate(sprintData?.fecha_fin),
-      resumen,
+      startDate: this.formatDate(sprintData?.fecha_inicio),
+      endDate: this.formatDate(sprintData?.fecha_fin),
+      summary,
     };
   }
 
-  async createEquipo(nombre: string): Promise<{ id: string; nombre: string }> {
+  async createTeam(name: string): Promise<{ id: string; name: string }> {
     await this.login();
 
     // Generar ID slug (misma lógica que el frontend)
-    const equipoId = nombre
+    const teamId = name
       .normalize('NFD')
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
       .replace(/\s+/g, '-');
 
     // Verificar si ya existe
-    const equipoRef = doc(this.db, 'equipos', equipoId);
-    const equipoSnap = await getDoc(equipoRef);
+    const teamRef = doc(this.db, 'equipos', teamId);
+    const teamSnapshot = await getDoc(teamRef);
 
-    if (equipoSnap.exists()) {
+    if (teamSnapshot.exists()) {
       throw new Error('Ya existe un equipo con ese nombre');
     }
 
     // Crear equipo
-    await setDoc(equipoRef, { nombre });
+    await setDoc(teamRef, { name });
 
-    return { id: equipoId, nombre };
+    return { id: teamId, name };
   }
 
-  async createPersonal(data: {
-    nombre: string;
-    rol: string;
-    correo?: string;
-    equipoId?: string;
+  async createPersonnel(data: {
+    name: string;
+    role: string;
+    email?: string;
+    teamId?: string;
   }): Promise<{ id: string }> {
     await this.login();
 
-    const personalRef = collection(this.db, 'personal');
-    const docRef = doc(personalRef);
+    const personnelRef = collection(this.db, 'personal');
+    const docRef = doc(personnelRef);
 
     const nuevoMiembro: any = {
-      nombre: data.nombre,
-      rol: data.rol,
+      name: data.name,
+      role: data.role,
     };
 
     // Agregar correo si existe
-    if (data.correo) {
-      nuevoMiembro.correo = data.correo;
+    if (data.email) {
+      nuevoMiembro.email = data.email;
     }
 
     // Agregar referencia al equipo si existe
-    if (data.equipoId) {
-      const equipoRef = doc(this.db, 'equipos', data.equipoId);
-      nuevoMiembro.equipo = equipoRef;
+    if (data.teamId) {
+      const teamRef = doc(this.db, 'equipos', data.teamId);
+      nuevoMiembro.team = teamRef;
     }
 
     await setDoc(docRef, nuevoMiembro);
@@ -540,68 +540,68 @@ export class FirebaseClient {
     return { id: docRef.id };
   }
 
-  async updatePersonalEquipo(personalId: string, equipoId: string) {
+  async updatePersonnelTeam(personnelId: string, teamId: string) {
     await this.login();
-    const personalRef = doc(this.db, 'personal', personalId);
-    const equipoRef = doc(this.db, 'equipos', equipoId);
+    const personnelRef = doc(this.db, 'personal', personnelId);
+    const teamRef = doc(this.db, 'equipos', teamId);
 
-    await setDoc(personalRef, { equipo: equipoRef }, { merge: true });
+    await setDoc(personnelRef, { team: teamRef }, { merge: true });
     return { ok: true };
   }
 
-  async updatePersonalVacaciones(personalId: string, vacaciones: boolean) {
+  async updatePersonnelVacation(personnelId: string, onVacation: boolean) {
     await this.login();
-    const personalRef = doc(this.db, 'personal', personalId);
+    const personnelRef = doc(this.db, 'personal', personnelId);
 
-    await setDoc(personalRef, { vacaciones }, { merge: true });
+    await setDoc(personnelRef, { onVacation }, { merge: true });
     return { ok: true };
   }
 
-  async addHistorialRotacion(data: any) {
+  async addRotationHistory(data: any) {
     await this.login();
-    const historialRef = collection(this.db, 'historialRotaciones');
+    const historyRef = collection(this.db, 'historialRotaciones');
 
-    await setDoc(doc(historialRef), {
+    await setDoc(doc(historyRef), {
       ...data,
-      fecha: new Date()
+      date: new Date()
     });
 
     return { ok: true };
   }
 
-  async savePerformanceEvaluacion(data: any) {
+  async savePerformanceEvaluation(data: any) {
     await this.login();
-    const { equipoId, nombreIngeniero } = data;
-    const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+    const { teamId, engineerName } = data;
+    const docId = engineerName.toLowerCase().replace(/\s/g, '-');
 
     // Auto-detect: find the correct collection number
-    const numeroEvaluacion = await this.findNextPerformanceCollection(equipoId, docId);
-    console.log(`[Performance] Auto-detected collection: performance-${numeroEvaluacion} for ${docId}`);
+    const evaluationNumber = await this.findNextPerformanceCollection(teamId, docId);
+    console.log(`[Performance] Auto-detected collection: performance-${evaluationNumber} for ${docId}`);
 
-    const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${numeroEvaluacion}/${docId}`;
+    const path = `teams/${teamId}/evaluaciones/perfomance/performance-${evaluationNumber}/${docId}`;
     const ref = doc(this.db, path);
 
     await setDoc(ref, {
       ...data,
-      numeroEvaluacion,
-      fecha: new Date(),
+      evaluationNumber,
+      date: new Date(),
     });
 
     // Actualizar progreso de la habilitación si existe
-    const habilitacionActiva = await this.getHabilitacionActiva(equipoId);
-    if (habilitacionActiva) {
-      const habilitacionRef = doc(this.db, 'habilitaciones_desempeno', (habilitacionActiva as any).id);
-      const evaluadosCount = ((habilitacionActiva as any).evaluadosCount || 0) + 1;
-      const totalEsperados = (habilitacionActiva as any).totalEsperados || 0;
+    const activeEnablement = await this.getActiveEnablement(teamId);
+    if (activeEnablement) {
+      const enablementRef = doc(this.db, 'habilitaciones_desempeno', (activeEnablement as any).id);
+      const evaluadosCount = ((activeEnablement as any).evaluadosCount || 0) + 1;
+      const totalExpected = (activeEnablement as any).totalExpected || 0;
 
-      await setDoc(habilitacionRef, {
+      await setDoc(enablementRef, {
         evaluadosCount,
-        estado: evaluadosCount >= totalEsperados ? 'Completado' : 'En proceso',
+        status: evaluadosCount >= totalExpected ? 'Completado' : 'En proceso',
         ultimaActualizacion: new Date()
       }, { merge: true });
     }
 
-    return { ok: true, numeroEvaluacion };
+    return { ok: true, evaluationNumber };
   }
 
   /**
@@ -610,11 +610,11 @@ export class FirebaseClient {
    * If the member does NOT exist in the latest collection → returns that N.
    * If no collections exist → returns 1.
    */
-  private async findNextPerformanceCollection(equipoId: string, docId: string): Promise<number> {
+  private async findNextPerformanceCollection(teamId: string, docId: string): Promise<number> {
     let lastNonEmpty = 0;
 
     for (let i = 1; i <= 20; i++) {
-      const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${i}`;
+      const path = `teams/${teamId}/evaluaciones/perfomance/performance-${i}`;
       const ref = collection(this.db, path);
       const snap = await getDocs(ref);
 
@@ -638,29 +638,29 @@ export class FirebaseClient {
     return lastNonEmpty + 1;
   }
 
-  async getPerformanceHistorial(equipoId: string) {
+  async getPerformanceHistory(teamId: string) {
     await this.login();
-    const allEvaluaciones: any[] = [];
+    const allEvaluations: any[] = [];
 
     // Iteramos hasta 10 evaluaciones como en el frontend actual
     for (let i = 1; i <= 10; i++) {
-      const path = `equipos/${equipoId}/evaluaciones/perfomance/performance-${i}`;
+      const path = `teams/${teamId}/evaluaciones/perfomance/performance-${i}`;
       const ref = collection(this.db, path);
       const snap = await getDocs(ref);
 
       if (!snap.empty) {
         snap.docs.forEach(d => {
           const data = d.data();
-          allEvaluaciones.push({
+          allEvaluations.push({
             ...data,
             numero: i,
-            fecha: data.fecha?.toDate?.() || data.fecha || new Date()
+            date: data.date?.toDate?.() || data.date || new Date()
           });
         });
       }
     }
 
-    return allEvaluaciones;
+    return allEvaluations;
   }
 
 
@@ -700,36 +700,36 @@ export class FirebaseClient {
     return { ok: true };
   }
 
-  async saveOtoEvaluacion(data: any) {
+  async saveOtoEvaluation(data: any) {
     await this.login();
-    const { equipoId, nombreIngeniero } = data;
-    const docId = nombreIngeniero.toLowerCase().replace(/\s/g, '-');
+    const { teamId, engineerName } = data;
+    const docId = engineerName.toLowerCase().replace(/\s/g, '-');
 
     // Auto-detect: find the correct collection number
-    const numeroEvaluacion = await this.findNextOtoCollection(equipoId, docId);
-    console.log(`[OTO] Auto-detected collection: one-to-one-${numeroEvaluacion} for ${docId}`);
+    const evaluationNumber = await this.findNextOtoCollection(teamId, docId);
+    console.log(`[OTO] Auto-detected collection: one-to-one-${evaluationNumber} for ${docId}`);
 
-    const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${numeroEvaluacion}/${docId}`;
+    const path = `teams/${teamId}/evaluaciones/one-to-one/one-to-one-${evaluationNumber}/${docId}`;
     const ref = doc(this.db, path);
 
     await setDoc(ref, {
       ...data,
-      numeroEvaluacion,
-      fecha: new Date(),
+      evaluationNumber,
+      date: new Date(),
     });
 
-    return { ok: true, numeroEvaluacion };
+    return { ok: true, evaluationNumber };
   }
 
   /**
    * Scans existing one-to-one-N collections to find where to save.
    * Same logic as performance: if member already exists in latest → N+1.
    */
-  private async findNextOtoCollection(equipoId: string, docId: string): Promise<number> {
+  private async findNextOtoCollection(teamId: string, docId: string): Promise<number> {
     let lastNonEmpty = 0;
 
     for (let i = 1; i <= 30; i++) {
-      const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${i}`;
+      const path = `teams/${teamId}/evaluaciones/one-to-one/one-to-one-${i}`;
       const ref = collection(this.db, path);
       const snap = await getDocs(ref);
 
@@ -753,90 +753,90 @@ export class FirebaseClient {
     return lastNonEmpty + 1;
   }
 
-  async getOtoHistorial(equipoId: string) {
+  async getOtoHistory(teamId: string) {
     await this.login();
-    const allEvaluaciones: any[] = [];
+    const allEvaluations: any[] = [];
 
     for (let i = 1; i <= 20; i++) {
-      const path = `equipos/${equipoId}/evaluaciones/one-to-one/one-to-one-${i}`;
+      const path = `teams/${teamId}/evaluaciones/one-to-one/one-to-one-${i}`;
       const ref = collection(this.db, path);
       const snap = await getDocs(ref);
 
       if (!snap.empty) {
         snap.docs.forEach(d => {
           const data = d.data();
-          allEvaluaciones.push({
+          allEvaluations.push({
             ...data,
             numero: i,
-            fecha: data.fecha?.toDate?.() || data.fechaSesion?.toDate?.() || data.fecha || new Date(),
+            date: data.date?.toDate?.() || data.sessionDate?.toDate?.() || data.date || new Date(),
           });
         });
       }
     }
 
-    return allEvaluaciones;
+    return allEvaluations;
   }
 
-  async habilitarPerformance(equipoId: string, nombreAdmin: string) {
+  async enablePerformance(teamId: string, adminName: string) {
     await this.login();
 
     // Verificar si ya existe una habilitación activa para este equipo
-    const existente = await this.getHabilitacionActiva(equipoId);
+    const existente = await this.getActiveEnablement(teamId);
     if (existente) {
       // Ya existe una habilitación activa, retornarla sin crear duplicado
       return existente;
     }
 
     // 1. Obtener integrantes del equipo para saber cuántos se esperan evaluar
-    const personal = await this.getPersonalByEquipo(equipoId);
-    const totalEsperados = personal.filter(p =>
+    const personnel = await this.getPersonnelByTeam(teamId);
+    const totalExpected = personnel.filter(p =>
       !['Arquitecto', 'Admin'].includes(String(p['rol'] || ''))
     ).length;
 
-    const equipo = await this.getEquipo(equipoId);
+    const team = await this.getTeam(teamId);
 
     const docRef = doc(collection(this.db, 'habilitaciones_desempeno'));
     const data = {
-      equipoId,
-      nombreEquipo: (equipo as any)?.nombre || equipoId,
-      nombreAdmin,
-      fechaHabilitacion: new Date(),
-      estado: 'Pendiente',
+      teamId,
+      teamName: (team as any)?.name || teamId,
+      adminName,
+      enabledAt: new Date(),
+      status: 'Pendiente',
       evaluadosCount: 0,
-      totalEsperados,
+      totalExpected,
     };
 
     await setDoc(docRef, data);
     return { id: docRef.id, ...data };
   }
 
-  async getHabilitacionesPerformance(equipoId?: string) {
+  async getPerformanceEnablements(teamId?: string) {
     await this.login();
-    const habilitacionesRef = collection(this.db, 'habilitaciones_desempeno');
-    let q = query(habilitacionesRef);
+    const enablementsRef = collection(this.db, 'habilitaciones_desempeno');
+    let q = query(enablementsRef);
 
-    if (equipoId) {
-      q = query(habilitacionesRef, where('equipoId', '==', equipoId));
+    if (teamId) {
+      q = query(enablementsRef, where('equipoId', '==', teamId));
     }
 
     const snap = await getDocs(q);
     return snap.docs.map(d => ({
       id: d.id,
       ...d.data(),
-      fechaHabilitacion: (d.data() as any).fechaHabilitacion?.toDate?.() || (d.data() as any).fechaHabilitacion
+      enabledAt: (d.data() as any).enabledAt?.toDate?.() || (d.data() as any).enabledAt
     })).sort((a, b) => {
-      const dateA = a.fechaHabilitacion?.getTime?.() || 0;
-      const dateB = b.fechaHabilitacion?.getTime?.() || 0;
+      const dateA = a.enabledAt?.getTime?.() || 0;
+      const dateB = b.enabledAt?.getTime?.() || 0;
       return dateB - dateA;
     });
   }
 
-  async getHabilitacionActiva(equipoId: string) {
+  async getActiveEnablement(teamId: string) {
     await this.login();
-    const habilitacionesRef = collection(this.db, 'habilitaciones_desempeno');
+    const enablementsRef = collection(this.db, 'habilitaciones_desempeno');
     const q = query(
-      habilitacionesRef,
-      where('equipoId', '==', equipoId),
+      enablementsRef,
+      where('equipoId', '==', teamId),
       where('estado', 'in', ['Pendiente', 'En proceso'])
     );
 
@@ -846,10 +846,10 @@ export class FirebaseClient {
     const docs = snap.docs.map(d => ({
       id: d.id,
       ...d.data(),
-      fechaHabilitacion: (d.data() as any).fechaHabilitacion?.toDate?.() || (d.data() as any).fechaHabilitacion
+      enabledAt: (d.data() as any).enabledAt?.toDate?.() || (d.data() as any).enabledAt
     })).sort((a, b) => {
-      const dateA = a.fechaHabilitacion?.getTime?.() || 0;
-      const dateB = b.fechaHabilitacion?.getTime?.() || 0;
+      const dateA = a.enabledAt?.getTime?.() || 0;
+      const dateB = b.enabledAt?.getTime?.() || 0;
       return dateB - dateA;
     });
 
