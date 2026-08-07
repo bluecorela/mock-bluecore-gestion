@@ -12,8 +12,6 @@ export interface MemberSummary {
 export interface Team {
   id: string;
   name: string;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
 }
 
 export interface Personnel {
@@ -26,24 +24,20 @@ export interface Personnel {
   onVacation: boolean | null;
   replacementStartSprintId: string | null;
   team?: { id: string; path: string; referencePath: string } | null;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
 }
 
 export interface Sprint {
   id: string;
-  firebase_id: string;
+  code: string;
   team_id: string;
   start_date: string | null;
   end_date: string | null;
   sprint_closed: boolean | null;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
 }
 
 export interface SprintMember {
   id: string;
-  firebase_id: string;
+  employeeCode: string;
   sprint_id: string;
   team_id: string;
   name: string | null;
@@ -59,8 +53,6 @@ export interface SprintMember {
   comments: string | null;
   evaluated_by: string | null;
   evaluation_date: string | null;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
 }
 
 export interface CurrentEngineer {
@@ -160,9 +152,11 @@ export interface SaveEvaluationRequest {
 export interface CreatePersonnelData {
   name: string;
   role: string;
-  email?: string;
+  email: string;
   teamId?: string;
   status?: 'activo' | 'inactivo';
+  authUserId?: string;
+  createdBy?: string;
 }
 
 export interface UpdatePersonnelData {
@@ -171,20 +165,7 @@ export interface UpdatePersonnelData {
   email?: string | null;
   teamId?: string | null;
   status?: 'activo' | 'inactivo';
-}
-
-export interface RotationHistoryRow {
-  id: string;
-  date: string | null;
-  type: string | null;
-  employee_name: string | null;
-  employee_id: string | null;
-  from_team: string | null;
-  from_name_team: string | null;
-  to_team: string | null;
-  to_name_team: string | null;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
+  createdBy?: string;
 }
 
 export interface SidebarModule {
@@ -195,8 +176,6 @@ export interface SidebarModule {
   order: number | null;
   visible: boolean | null;
   permittedRoles: string[] | null;
-  firebase_path?: string | null;
-  raw_data?: Record<string, unknown>;
 }
 
 export interface MaintenanceStatus {

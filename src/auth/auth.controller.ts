@@ -88,8 +88,12 @@ export class AuthController {
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
   @ApiResponse({ status: 401, description: 'Token inválido o ausente' })
   @ApiResponse({ status: 403, description: 'Solo administradores' })
-  async updateUser(@Param('id') id: string, @Body() body: UpdateAuthUserDto) {
-    const result = await this.authService.updateUser(id, body);
+  async updateUser(
+    @Param('id') id: string,
+    @Body() body: UpdateAuthUserDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    const result = await this.authService.updateUser(id, body, currentUser.supabaseUserId);
 
     if (!result) {
       throw new NotFoundException('Usuario no encontrado');

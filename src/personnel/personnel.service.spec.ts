@@ -1,18 +1,51 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { PersonnelService } from './personnel.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
-describe('PersonalService', () => {
-  let service: PersonnelService;
+describe('PersonnelService', () => {
+  const dataService = {
+    createPersonnel: jest.fn(),
+  } as unknown as SupabaseDataService;
+  const service = new PersonnelService(dataService);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [PersonnelService],
-    }).compile();
+  beforeEach(() => jest.clearAllMocks());
 
-    service = module.get<PersonnelService>(PersonnelService);
+  it('creates personnel with the authenticated administrator as creator', async () => {
+    jest.spyOn(dataService, 'createPersonnel').mockResolvedValue({ id: 'employee-id' });
+
+    await expect(service.create({
+      name: 'Ana Pérez',
+      email: 'ana@bluecorela.com',
+      role: 'Ingeniero de Software',
+      teamId: 'gb-web',
+    }, 'auth-user-id')).resolves.toEqual({ id: 'employee-id' });
+
+    expect(dataService.createPersonnel).toHaveBeenCalledWith({
+      name: 'Ana Pérez',
+      email: 'ana@bluecorela.com',
+      role: 'Ingeniero de Software',
+      teamId: 'gb-web',
+      createdBy: 'auth-user-id',
+    });
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+  it('rejects an engineer without a team', async () => {
+    await expect(service.create({
+      name: 'Ana Pérez',
+      email: 'ana@bluecorela.com',
+      role: 'Ingeniero de QA',
+    })).rejects.toBeInstanceOf(BadRequestException);
+  });
+
+  it('allows project-level roles without a team', async () => {
+    jest.spyOn(dataService, 'createPersonnel').mockResolvedValue({ id: 'architect-id' });
+
+    await service.create({
+      name: 'Ana Pérez',
+      email: 'ana@bluecorela.com',
+      role: 'Arquitecto',
+    });
+
+    expect(dataService.createPersonnel).toHaveBeenCalled();
   });
 });

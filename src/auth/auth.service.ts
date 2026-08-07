@@ -40,7 +40,17 @@ export class AuthService {
       throw new UnauthorizedException('Token de Supabase inválido o expirado');
     }
 
-    const personnel = await this.supabaseDataService.getPersonnelByEmail(data.user.email);
+    let personnel = await this.supabaseDataService.getPersonnelByAuthUserId(data.user.id);
+    if (!personnel) {
+      personnel = await this.supabaseDataService.getPersonnelByEmail(data.user.email);
+      if (personnel) {
+        await this.supabaseDataService.linkPersonnelToAuthUser(personnel.id, data.user.id);
+      }
+    }
+
+    if (!personnel) {
+      throw new UnauthorizedException('El usuario no tiene un perfil de personal asociado');
+    }
 
     if (personnel?.status === 'inactivo') {
       throw new UnauthorizedException('Usuario inactivo');
@@ -89,13 +99,24 @@ export class AuthService {
       throw new BadRequestException(error?.message ?? 'No se pudo crear el usuario en Supabase Auth');
     }
 
-    const personnel = await this.supabaseDataService.createPersonnel({
-      name: data.name,
-      role: data.role,
-      email: data.email,
-      teamId: data.teamId,
-      status: 'activo',
-    });
+    let personnel: { id: string };
+    try {
+      personnel = await this.supabaseDataService.createPersonnel({
+        name: data.name,
+        role: data.role,
+        email: data.email,
+        teamId: data.teamId,
+        status: 'activo',
+        authUserId: authData.user.id,
+      });
+    } catch (personnelError) {
+      const { error: rollbackError } = await this.supabaseClient.getClient()
+        .auth.admin.deleteUser(authData.user.id);
+      const detail = rollbackError
+        ? ` No se pudo revertir el usuario de Auth: ${rollbackError.message}`
+        : '';
+      throw new BadRequestException(`No se pudo crear el perfil de personal.${detail}`);
+    }
 
     const emailResult = data.sendPasswordEmail === false
       ? { sent: false, warning: 'Envío de correo omitido.' }
@@ -115,11 +136,18 @@ export class AuthService {
     };
   }
 
-  async updateUser(personnelId: string, data: UpdateAuthUserDto) {
+  async updateUser(personnelId: string, data: UpdateAuthUserDto, updatedBy?: string) {
     const currentPersonnel = await this.supabaseDataService.getPersonnelById(personnelId);
 
     if (!currentPersonnel) {
       return null;
+    }
+
+    const effectiveRole = data.role ?? currentPersonnel.role;
+    const effectiveTeamId = data.teamId === undefined ? currentPersonnel.teamId : data.teamId;
+    if (effectiveRole && ['Ingeniero de Software', 'Ingeniero de QA', 'Pasante'].includes(effectiveRole)
+      && !effectiveTeamId) {
+      throw new BadRequestException(`El rol ${effectiveRole} requiere equipo`);
     }
 
     const updatedPersonnel = await this.supabaseDataService.updatePersonnel(personnelId, {
@@ -128,12 +156,16 @@ export class AuthService {
       email: data.email,
       teamId: data.teamId,
       status: data.status,
+      createdBy: updatedBy,
     });
 
     const authEmail = data.email ?? currentPersonnel.email;
-    const authUser = authEmail
-      ? await this.findAuthUserByEmail(authEmail)
-      : null;
+    const authUserId = await this.supabaseDataService.getPersonnelAuthUserId(personnelId);
+    const authUser = authUserId
+      ? await this.findAuthUserById(authUserId)
+      : currentPersonnel.email
+        ? await this.findAuthUserByEmail(currentPersonnel.email)
+        : authEmail ? await this.findAuthUserByEmail(authEmail) : null;
 
     if (authUser) {
       const authUpdate: {
@@ -185,7 +217,7 @@ export class AuthService {
         throw new BadRequestException('El usuario necesita correo para crear acceso en Supabase Auth');
       }
 
-      const { error } = await this.supabaseClient.getClient().auth.admin.createUser({
+      const { data: createdAuthData, error } = await this.supabaseClient.getClient().auth.admin.createUser({
         email: authEmail,
         password: data.password,
         email_confirm: data.emailConfirm ?? true,
@@ -201,6 +233,10 @@ export class AuthService {
 
       if (error) {
         throw new BadRequestException(error.message);
+      }
+
+      if (createdAuthData.user) {
+        await this.supabaseDataService.linkPersonnelToAuthUser(personnelId, createdAuthData.user.id);
       }
 
       const emailResult = data.sendPasswordEmail === false
@@ -227,7 +263,7 @@ export class AuthService {
   }
 
   async markPasswordChanged(user: AuthenticatedUser) {
-    const authUser = await this.findAuthUserByEmail(user.email);
+    const authUser = await this.findAuthUserById(user.supabaseUserId);
 
     if (!authUser) {
       throw new BadRequestException('Usuario de Supabase Auth no encontrado');
@@ -357,5 +393,15 @@ export class AuthService {
     }
 
     return null;
+  }
+
+  private async findAuthUserById(authUserId: string): Promise<User | null> {
+    const { data, error } = await this.supabaseClient.getClient()
+      .auth.admin.getUserById(authUserId);
+    if (error) {
+      if (error.status === 404) return null;
+      throw new BadRequestException(error.message);
+    }
+    return data.user ?? null;
   }
 }

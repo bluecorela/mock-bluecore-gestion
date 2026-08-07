@@ -44,9 +44,9 @@ export class TeamsService {
 
     // Mapear sprints al formato que espera OperacionesService y el Dashboard
     const sprints: DashboardSprint[] = await Promise.all(rawSprints.map(async (s) => {
-      const members = await this.supabaseDataService.getMembersBySprint(teamId, s.firebase_id);
+      const members = await this.supabaseDataService.getMembersBySprint(teamId, s.code);
       return {
-        id: s.firebase_id,
+        id: s.code,
         startDate: s.start_date ?? null,
         endDate: s.end_date ?? null,
         sprintClosed: s.sprint_closed ?? null,
@@ -160,8 +160,8 @@ export class TeamsService {
   async getSprintsByTeam(teamId: string): Promise<TeamSprintResponse[]> {
     const sprints = await this.supabaseDataService.getSprintsByTeam(teamId);
     return sprints.map((s) => ({
-      id: s.firebase_id,
-      name: s.firebase_id,
+      id: s.code,
+      name: s.code,
       startDate: s.start_date ?? null,
       endDate: s.end_date ?? null,
       sprintClosed: s.sprint_closed ?? null,
@@ -177,7 +177,7 @@ export class TeamsService {
     if (!sprint) return null;
 
     return {
-      id: sprint.firebase_id,
+      id: sprint.code,
       fecha_inicio: sprint.start_date,
       fecha_fin: sprint.end_date,
       sprintClosed: sprint.sprint_closed ?? null,

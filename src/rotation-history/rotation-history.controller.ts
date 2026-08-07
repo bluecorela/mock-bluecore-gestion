@@ -1,9 +1,12 @@
-import { Controller, Get, NotFoundException } from '@nestjs/common';
+import { Controller, Get, NotFoundException, UseGuards } from '@nestjs/common';
 import { RotationHistoryService } from './rotation-history.service';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '../auth/auth.guard';
 
 @ApiTags('Historial Rotaciones')
 @Controller('rotation-history')
+@UseGuards(AuthGuard)
+@ApiBearerAuth()
 export class RotationHistoryController {
     constructor(
         private readonly rotationHistoryService: RotationHistoryService,

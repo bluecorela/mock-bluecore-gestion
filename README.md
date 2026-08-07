@@ -14,7 +14,7 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 - **Dynamic Sidebar**: Módulos de navegación controlados por rol desde Supabase.
 - **Maintenance Mode**: Endpoint para activar/desactivar modo mantenimiento global.
 - **Supabase Integration**: PostgreSQL como base de datos y Supabase Data API para acceso desde el backend.
-- **Migration Utilities**: Scripts para exportar Firestore y preparar/importar datos hacia Supabase.
+- **Migration Utilities**: Scripts históricos para preparar e importar datos hacia Supabase.
 
 ## Prerequisites
 
@@ -43,7 +43,12 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 ```
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your_secret_or_service_role_key
+   SUPABASE_V2_SCHEMA=bluecore_v2
 ```
+
+`SUPABASE_V2_SCHEMA` is optional and defaults to `bluecore_v2`. Application
+data access uses `SupabaseClient.getV2Client()`; the default Supabase client is
+reserved for Auth administration.
 ## Running the Application
 
 ```bash
@@ -58,6 +63,69 @@ npm run start:debug
 ```
 
 The application will start on `http://localhost:3000` by default.
+
+## Docker and cloud deployment
+
+The API is stateless: application data is persisted in Supabase, so the API
+container does not require a Docker volume. Runtime secrets must be configured
+in the cloud provider and must never be copied into the image.
+
+Create the environment files from the safe templates. Use different Supabase
+projects and credentials for every environment:
+
+```bash
+cp .env.development.example .env.development
+cp .env.test.example .env.test
+cp .env.production.example .env.production
+```
+
+Development with hot reload:
+
+```bash
+ENV_FILE=.env.development NODE_ENV=development docker compose \
+  -f docker-compose.yml -f docker-compose.development.yml up --build
+```
+
+Tests in an isolated container:
+
+```bash
+ENV_FILE=.env.test NODE_ENV=test docker compose \
+  -f docker-compose.yml -f docker-compose.test.yml run --rm api
+```
+
+Production-like local validation:
+
+```bash
+ENV_FILE=.env.production NODE_ENV=production docker compose up --build -d
+docker compose ps
+curl http://localhost:3000/api
+```
+
+Build an image for a registry:
+
+```bash
+docker build -t REGISTRY/bluecore-gestion-api:VERSION .
+docker push REGISTRY/bluecore-gestion-api:VERSION
+```
+
+Cloud runtime requirements:
+
+- Inject `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_ANON_KEY`
+  using the provider's secret manager.
+- Set `CORS_ORIGINS` to the comma-separated production frontend origins.
+- Set `FRONTEND_URL` to the production frontend URL.
+- Keep `SWAGGER_ENABLED=false` unless API documentation must be public.
+- Route health checks to `GET /api` on the platform-provided `PORT`.
+- Do not mount persistent storage; Supabase is the persistence layer.
+
+Environment file precedence outside Docker is:
+
+1. Variables injected by the operating system or cloud secret manager.
+2. `.env.<NODE_ENV>.local`.
+3. `.env.<NODE_ENV>`.
+4. `.env` as a local fallback.
+
+Never reuse the production Supabase service-role key in development or tests.
 
 ## Testing
 
@@ -120,8 +188,6 @@ src/
 │   ├── supabase.client.ts     # Supabase client wrapper
 │   ├── supabase-data.service.ts # Data access layer
 │   └── interfaces/
-├── firebase/
-│   └── firebase.client.ts     # Legacy Firebase client kept for migration reference
 ├── teams/
 │   ├── teams.controller.ts  # Teams & Sprints endpoints
 │   ├── teams.service.ts     # Dashboard, metrics & evaluation logic
@@ -172,8 +238,6 @@ Total Final = (Entregadas/Asignadas) × 0.4 + (Netas/Entregadas) × 0.4 + (Calid
 Migration Scripts
 
 ```bash
-npm run firebase:export
-npm run supabase:prepare
 npm run supabase:check
 ```
 

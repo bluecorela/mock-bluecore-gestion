@@ -24,12 +24,12 @@ export class UpdateAuthUserDto {
 
   @ApiPropertyOptional({
     description: 'Rol del usuario',
-    enum: ['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'],
+    enum: ['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'],
     example: 'Ingeniero de Software',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'])
+  @IsIn(['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'])
   role?: string;
 
   @ApiPropertyOptional({

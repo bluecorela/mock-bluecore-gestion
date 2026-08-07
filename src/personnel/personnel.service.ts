@@ -22,23 +22,14 @@ export class PersonnelService {
     return this.supabaseDataService.getPersonnel();
   }
 
-  async create(createPersonnelDto: CreatePersonnelDto) {
+  async create(createPersonnelDto: CreatePersonnelDto, createdBy?: string) {
     const { name, role, email, teamId } = createPersonnelDto;
 
-    // Validaciones de negocio según el rol
-    if (role === 'Admin' && !email) {
-      throw new BadRequestException('El rol Admin requiere correo');
-    }
-
-    if (role === 'Arquitecto' && (!email || !teamId)) {
-      throw new BadRequestException('El rol Arquitecto requiere correo y equipo');
-    }
-
     if (['Ingeniero de Software', 'Ingeniero de QA', 'Pasante'].includes(role) && !teamId) {
-      throw new BadRequestException(`El rol ${role} requiere team`);
+      throw new BadRequestException(`El rol ${role} requiere equipo`);
     }
 
-    return this.supabaseDataService.createPersonnel({ name, role, email, teamId });
+    return this.supabaseDataService.createPersonnel({ name, role, email, teamId, createdBy });
   }
 
 }

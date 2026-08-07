@@ -1,0 +1,13 @@
+services:
+  api:
+    build:
+      context: .
+      target: builder
+    image: bluecore-gestion-api:test
+    command: npm test -- --runInBand
+    restart: "no"
+    environment:
+      NODE_ENV: test
+    read_only: false
+    healthcheck:
+      disable: true
