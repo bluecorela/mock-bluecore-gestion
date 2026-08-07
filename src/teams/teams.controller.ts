@@ -1,14 +1,24 @@
-import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, NotFoundException, BadRequestException, ConflictException, Query, UseGuards } from '@nestjs/common';
 import { TeamsService } from './teams.service';
-import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreateTeamDto } from './dto/create-team.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 
 @ApiTags('Equipos')
 @Controller('teams')
+@UseGuards(AuthGuard)
+@ApiBearerAuth()
 export class TeamsController {
   constructor(private readonly teamsService: TeamsService) { }
 
   @Post()
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Crear un nuevo equipo' })
   @ApiResponse({ status: 201, description: 'Equipo creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos' })
@@ -179,9 +189,11 @@ export class TeamsController {
   }
 
   @Post('sprint-evaluation')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('Admin', 'Arquitecto')
   @ApiOperation({ summary: 'Guardar evaluación de sprint para un integrante' })
   @ApiResponse({ status: 201, description: 'Evaluación de sprint guardada exitosamente' })
-  async saveSprintEvaluation(@Body() body: any) {
-    return this.teamsService.saveEvaluation(body);
+  async saveSprintEvaluation(@Body() body: any, @CurrentUser() user: AuthenticatedUser) {
+    return this.teamsService.saveEvaluation({ ...body, evaluatorEmail: user.email });
   }
 }

@@ -1,20 +1,21 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { TeamsController } from './teams.controller';
 import { TeamsService } from './teams.service';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 
-describe('EquiposController', () => {
-  let controller: TeamsController;
+describe('TeamsController', () => {
+  it('delegates sprint evaluation creation to the service', async () => {
+    const teamsService = {
+      saveEvaluation: jest.fn().mockResolvedValue({ ok: true, sprintClosed: false }),
+    } as unknown as TeamsService;
+    const controller = new TeamsController(teamsService);
+    const body = { teamId: 'sgb-evolucion', sprintId: 'sprint-17', evaluatorEmail: 'spoofed@example.com' };
+    const user = { email: 'architect@bluecorela.com' } as AuthenticatedUser;
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [TeamsController],
-      providers: [TeamsService],
-    }).compile();
-
-    controller = module.get<TeamsController>(TeamsController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+    await expect(controller.saveSprintEvaluation(body, user))
+      .resolves.toEqual({ ok: true, sprintClosed: false });
+    expect(teamsService.saveEvaluation).toHaveBeenCalledWith({
+      ...body,
+      evaluatorEmail: user.email,
+    });
   });
 });

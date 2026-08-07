@@ -1,19 +1,27 @@
-import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
 import { PersonnelService } from './personnel.service';
-import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CreatePersonnelDto } from './dto/create-personnel.dto';
+import { AuthGuard } from '../auth/auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 
 @ApiTags('Personal')
 @Controller('personnel')
+@UseGuards(AuthGuard)
+@ApiBearerAuth()
 export class PersonnelController {
   constructor(private readonly personnelService: PersonnelService) { }
 
   @Post()
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Crear un nuevo miembro del personal' })
   @ApiResponse({ status: 201, description: 'Miembro creado exitosamente' })
   @ApiResponse({ status: 400, description: 'Datos inválidos o validación de negocio fallida' })
-  async create(@Body() createPersonnelDto: CreatePersonnelDto) {
-    return await this.personnelService.create(createPersonnelDto);
+  async create(@Body() createPersonnelDto: CreatePersonnelDto, @CurrentUser() user: AuthenticatedUser) {
+    return await this.personnelService.create(createPersonnelDto, user.supabaseUserId);
   }
 
   @Get()

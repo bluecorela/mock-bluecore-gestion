@@ -12,21 +12,21 @@ export class CreatePersonnelDto {
 
     @ApiProperty({
         description: 'Rol del miembro',
-        enum: ['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'],
+        enum: ['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'],
         example: 'Ingeniero de Software'
     })
     @IsNotEmpty({ message: 'El rol es obligatorio' })
-    @IsIn(['Admin', 'Arquitecto', 'Ingeniero de Software', 'Ingeniero de QA', 'Pasante'])
+    @IsIn(['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'])
     role: string;
 
     @ApiProperty({
         description: 'Correo electrónico',
-        required: false,
+        required: true,
         example: 'juan@example.com'
     })
-    @IsOptional()
+    @IsNotEmpty({ message: 'El correo es obligatorio' })
     @IsEmail({}, { message: 'El correo debe ser válido' })
-    email?: string;
+    email: string;
 
     @ApiProperty({
         description: 'ID del equipo',

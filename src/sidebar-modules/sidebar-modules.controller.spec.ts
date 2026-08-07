@@ -1,18 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { SidebarModulesController } from './sidebar-modules.controller';
+import { SidebarModulesService } from './sidebar-modules.service';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 
-describe('ModulosSidebarController', () => {
-  let controller: SidebarModulesController;
+describe('SidebarModulesController', () => {
+  it('returns modules provided by the service', async () => {
+    const modules = [{ id: 'dashboard', name: 'Dashboard' }];
+    const service = {
+      getModulesByRole: jest.fn().mockResolvedValue(modules),
+    } as unknown as SidebarModulesService;
+    const controller = new SidebarModulesController(service);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      controllers: [SidebarModulesController],
-    }).compile();
-
-    controller = module.get<SidebarModulesController>(SidebarModulesController);
-  });
-
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
+    const user = { role: 'Admin' } as AuthenticatedUser;
+    await expect(controller.getModulesByRole('Admin', user)).resolves.toEqual(modules);
+    expect(service.getModulesByRole).toHaveBeenCalledWith('Admin');
   });
 });

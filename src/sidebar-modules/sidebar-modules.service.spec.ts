@@ -1,18 +1,13 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { SidebarModulesService } from './sidebar-modules.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
-describe('ModulosSidebarService', () => {
-  let service: SidebarModulesService;
+describe('SidebarModulesService', () => {
+  it('returns the v2 navigation modules for the requested role', async () => {
+    const modules = [{ id: 'module-id', name: 'Dashboard', route: '/dashboard' }];
+    const dataService = { getModulesByRole: jest.fn().mockResolvedValue(modules) };
+    const service = new SidebarModulesService(dataService as unknown as SupabaseDataService);
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [SidebarModulesService],
-    }).compile();
-
-    service = module.get<SidebarModulesService>(SidebarModulesService);
-  });
-
-  it('should be defined', () => {
-    expect(service).toBeDefined();
+    await expect(service.getModulesByRole('Admin')).resolves.toEqual(modules);
+    expect(dataService.getModulesByRole).toHaveBeenCalledWith('Admin');
   });
 });

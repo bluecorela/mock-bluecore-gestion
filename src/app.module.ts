@@ -13,11 +13,17 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
+import { OrganizationV2Module } from './v2/organization/organization-v2.module';
+import { WeeklyDashboardV2Module } from './v2/weekly-dashboard/weekly-dashboard-v2.module';
+import { environmentFilePaths, validateEnvironment } from './config/environment';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      cache: true,
+      envFilePath: environmentFilePaths(),
+      validate: validateEnvironment,
     }),
     PersonnelModule,
     TeamsModule,
@@ -30,6 +36,8 @@ import { AuthModule } from './auth/auth.module';
     MaintenanceModule,
     SupabaseModule,
     AuthModule,
+    OrganizationV2Module,
+    WeeklyDashboardV2Module,
   ],
   controllers: [AppController],
   providers: [AppService],
