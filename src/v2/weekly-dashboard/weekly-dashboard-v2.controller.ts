@@ -3,7 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestj
 import { WeeklyDashboardV2Service } from './weekly-dashboard-v2.service';
 import { SaveWeeklyReportV2Dto } from './dto/save-weekly-report.dto';
 import { AuthGuard } from '../../auth/auth.guard';
-import { AdminGuard } from '../../auth/admin.guard';
+import { RolesGuard } from '../../auth/roles.guard';
+import { Roles } from '../../auth/roles.decorator';
 import { WeeklyReportContextQueryV2Dto } from './dto/weekly-report-context-query.dto';
 
 @ApiTags('Weekly dashboard v2')
@@ -31,9 +32,13 @@ export class WeeklyDashboardV2Controller {
   }
 
   @Post()
-  @UseGuards(AuthGuard, AdminGuard)
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('Admin', 'Scrum Master', 'Arquitecto')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create or update a complete weekly dashboard report' })
+  @ApiOperation({
+    summary: 'Create or update a complete weekly dashboard report',
+    description: 'Available to administrators, Scrum Masters and architects.',
+  })
   saveReport(
     @Param('teamId', new ParseUUIDPipe()) teamId: string,
     @Body() input: SaveWeeklyReportV2Dto,

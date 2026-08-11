@@ -475,6 +475,7 @@ export class SupabaseDataService {
       Admin: 'ADMIN', Arquitecto: 'ARCHITECT', 'Scrum Master': 'SCRUM_MASTER',
       'Ingeniero de Software': 'SOFTWARE_ENGINEER', 'Ingeniero de QA': 'QA_ENGINEER',
       'Ingeniero QA': 'QA_ENGINEER', 'Creador de Bienestar': 'WELLBEING_CREATOR',
+      Pasante: 'INTERN',
     };
     const roleCode = roleCodes[role] ?? role.toUpperCase();
     const { data: roleRecord, error: roleError } = await database.from('roles')
@@ -501,6 +502,48 @@ export class SupabaseDataService {
       visible: moduleItem.is_visible,
       permittedRoles: [role],
     }));
+  }
+
+  async getSidebarConfiguration() {
+    const database = this.supabaseClient.getV2Client();
+    const [{ data: modules, error: moduleError }, { data: assignments, error: assignmentError }, { data: roles, error: roleError }] = await Promise.all([
+      database.from('sidebar_modules').select('*').order('display_order'),
+      database.from('sidebar_module_roles').select('module_id,role_id'),
+      database.from('roles').select('id,code,name').order('name'),
+    ]);
+    if (moduleError) throw moduleError;
+    if (assignmentError) throw assignmentError;
+    if (roleError) throw roleError;
+    const rolesById = new Map((roles ?? []).map((role) => [role.id, role]));
+    const roleCodesByModule = new Map<string, string[]>();
+    for (const assignment of assignments ?? []) {
+      const role = rolesById.get(assignment.role_id);
+      if (!role) continue;
+      const codes = roleCodesByModule.get(assignment.module_id) ?? [];
+      codes.push(role.code);
+      roleCodesByModule.set(assignment.module_id, codes);
+    }
+    return {
+      modules: (modules ?? []).map((moduleItem) => ({
+        id: moduleItem.id,
+        code: moduleItem.code,
+        name: moduleItem.name,
+        route: moduleItem.route,
+        icon: moduleItem.icon,
+        displayOrder: moduleItem.display_order,
+        isVisible: moduleItem.is_visible,
+        roleCodes: roleCodesByModule.get(moduleItem.id) ?? [],
+      })),
+      roles: (roles ?? []).map((role) => ({ code: role.code, name: role.name })),
+    };
+  }
+
+  async saveSidebarModule(input: object) {
+    const { data: moduleId, error } = await this.supabaseClient.getV2Client()
+      .rpc('save_sidebar_module', { p_payload: input });
+    if (error) throw error;
+    const configuration = await this.getSidebarConfiguration();
+    return configuration.modules.find((moduleItem) => moduleItem.id === moduleId) ?? null;
   }
 
   async getMaintenanceStatus(): Promise<MaintenanceStatus> {

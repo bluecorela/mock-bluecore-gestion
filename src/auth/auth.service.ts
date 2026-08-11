@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { inspect } from 'node:util';
 import type { User } from '@supabase/supabase-js';
 import { SupabaseClient } from '../supabase/supabase.client';
@@ -6,6 +6,7 @@ import { SupabaseDataService } from '../supabase/supabase-data.service';
 import { AuthenticatedUser } from './interfaces/auth-user.interface';
 import { CreateAuthUserDto } from './dto/create-auth-user.dto';
 import { UpdateAuthUserDto } from './dto/update-auth-user.dto';
+import { LoginDto } from './dto/login.dto';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +27,28 @@ export class AuthService {
     }
 
     return token;
+  }
+
+  async loginForApiDocumentation(input: LoginDto) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new NotFoundException('Endpoint no disponible');
+    }
+
+    const { data, error } = await this.supabaseClient.getPublicClient().auth.signInWithPassword({
+      email: input.email,
+      password: input.password,
+    });
+    if (error || !data.session?.access_token) {
+      throw new UnauthorizedException('Correo o contraseña inválidos');
+    }
+
+    const user = await this.validateAccessToken(data.session.access_token);
+    return {
+      accessToken: data.session.access_token,
+      tokenType: data.session.token_type || 'bearer',
+      expiresAt: data.session.expires_at ?? null,
+      user,
+    };
   }
 
   async validateAuthorizationHeader(authorization?: string): Promise<AuthenticatedUser> {
@@ -69,6 +92,18 @@ export class AuthService {
 
   async getUsers() {
     return this.supabaseDataService.getPersonnel();
+  }
+
+  async getBootstrap(user: AuthenticatedUser) {
+    const [sidebarModules, maintenance] = await Promise.all([
+      user.role ? this.supabaseDataService.getModulesByRole(user.role) : Promise.resolve([]),
+      this.supabaseDataService.getMaintenanceStatus(),
+    ]);
+    return {
+      user,
+      sidebarModules,
+      maintenance: { active: maintenance?.active ?? false },
+    };
   }
 
   async getUser(personnelId: string) {

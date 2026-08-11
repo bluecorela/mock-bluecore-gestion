@@ -16,14 +16,18 @@ describe('AuthService', () => {
   };
   const authApi = {
     getUser: jest.fn(),
+    signInWithPassword: jest.fn(),
   };
   const supabaseClient = {
     getClient: jest.fn(() => ({ auth: authApi })),
+    getPublicClient: jest.fn(() => ({ auth: authApi })),
   } as unknown as SupabaseClient;
   const dataService = {
     getPersonnelByAuthUserId: jest.fn(),
     getPersonnelByEmail: jest.fn(),
     linkPersonnelToAuthUser: jest.fn(),
+    getModulesByRole: jest.fn(),
+    getMaintenanceStatus: jest.fn(),
   } as unknown as SupabaseDataService;
   const service = new AuthService(supabaseClient, dataService);
 
@@ -60,5 +64,37 @@ describe('AuthService', () => {
 
     await expect(service.validateAccessToken('token'))
       .rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('returns an access token for API documentation outside production', async () => {
+    authApi.signInWithPassword.mockResolvedValue({
+      data: { session: { access_token: 'jwt-token', token_type: 'bearer', expires_at: 123 } },
+      error: null,
+    });
+    jest.spyOn(dataService, 'getPersonnelByAuthUserId').mockResolvedValue(personnel as any);
+
+    await expect(service.loginForApiDocumentation({
+      email: authUser.email,
+      password: 'Password123!',
+    })).resolves.toMatchObject({ accessToken: 'jwt-token', user: { personnelId: personnel.id } });
+  });
+
+  it('returns the authenticated application bootstrap in one response', async () => {
+    jest.spyOn(dataService, 'getModulesByRole').mockResolvedValue([{ id: 'home' }] as any);
+    jest.spyOn(dataService, 'getMaintenanceStatus').mockResolvedValue({ active: false });
+
+    await expect(service.getBootstrap({
+      supabaseUserId: authUser.id,
+      email: authUser.email,
+      personnelId: personnel.id,
+      name: personnel.name,
+      role: personnel.role,
+      teamId: null,
+      mustChangePassword: false,
+    })).resolves.toMatchObject({
+      sidebarModules: [{ id: 'home' }],
+      maintenance: { active: false },
+      user: { personnelId: personnel.id },
+    });
   });
 });

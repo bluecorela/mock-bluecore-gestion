@@ -161,4 +161,58 @@ export class PerformanceService {
     async getActiveEnablement(teamId: string) {
         return this.supabaseDataService.getActiveEnablement(teamId);
     }
+
+    async getContext(teamId: string) {
+        const [team, members, config, activeEnablement, history] = await Promise.all([
+            this.supabaseDataService.getTeam(teamId),
+            this.supabaseDataService.getEmployeeByTeam(teamId),
+            this.getConfig(),
+            this.getActiveEnablement(teamId),
+            this.getHistory(teamId),
+        ]);
+
+        if (!team) throw new NotFoundException('No existe el equipo');
+        return { team, members, config, activeEnablement, history };
+    }
+
+    async getAdminOverview() {
+        const [teams, enablements] = await Promise.all([
+            this.supabaseDataService.getTeams(),
+            this.getEnablements(),
+        ]);
+
+        const teamSummaries = await Promise.all(teams.map(async (team) => {
+            const [members, evaluations] = await Promise.all([
+                this.supabaseDataService.getEmployeeByTeam(team.id),
+                this.getHistory(team.id),
+            ]);
+            const enablement = enablements.find((item: any) =>
+                item.teamId === team.id
+                && ['Habilitada', 'En proceso', 'Completado', 'Pendiente'].includes(item.status),
+            ) ?? null;
+            const evaluableMembers = members.filter((member) =>
+                Boolean(member.role) && !['Arquitecto', 'Admin'].includes(member.role!),
+            );
+            const periodEvaluations = enablement
+                ? evaluations.filter((evaluation: any) =>
+                    new Date(evaluation.date).getTime() >= new Date(enablement.enabledAt).getTime())
+                : evaluations;
+            const evaluatedNames = new Set(periodEvaluations.map((evaluation: any) =>
+                evaluation.engineerName?.toLowerCase(),
+            ));
+            return {
+                team,
+                enablement,
+                members,
+                evaluations,
+                totalMembers: evaluableMembers.length,
+                totalEvaluations: periodEvaluations.length,
+                pendingEvaluations: evaluableMembers.filter((member) =>
+                    !evaluatedNames.has(member.name?.toLowerCase()),
+                ).length,
+            };
+        }));
+
+        return { teams, enablements, teamSummaries };
+    }
 }

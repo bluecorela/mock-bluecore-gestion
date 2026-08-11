@@ -1,9 +1,11 @@
-import { Controller, Get, Param, BadRequestException, NotFoundException, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Get, Param, BadRequestException, NotFoundException, UseGuards, ForbiddenException, Post, Patch } from '@nestjs/common';
 import { SidebarModulesService } from './sidebar-modules.service';
 import { ApiBearerAuth, ApiParam, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { AdminGuard } from '../auth/admin.guard';
+import { CreateSidebarModuleDto, UpdateSidebarModuleDto } from './dto/sidebar-module.dto';
 
 @ApiTags('Modulos Sidebar')
 @Controller('sidebar-modules')
@@ -11,6 +13,27 @@ import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 @ApiBearerAuth()
 export class SidebarModulesController {
     constructor(private readonly sidebarModulesService: SidebarModulesService) { }
+
+    @Get('admin/configuration')
+    @UseGuards(AuthGuard, AdminGuard)
+    @ApiOperation({ summary: 'Listar configuración completa del sidebar (solo Admin)' })
+    getConfiguration() {
+      return this.sidebarModulesService.getConfiguration();
+    }
+
+    @Post()
+    @UseGuards(AuthGuard, AdminGuard)
+    @ApiOperation({ summary: 'Crear un módulo del sidebar y asignarlo a roles (solo Admin)' })
+    createModule(@Body() body: CreateSidebarModuleDto) {
+      return this.sidebarModulesService.createModule(body);
+    }
+
+    @Patch(':moduleId')
+    @UseGuards(AuthGuard, AdminGuard)
+    @ApiOperation({ summary: 'Editar un módulo del sidebar y sus roles (solo Admin)' })
+    updateModule(@Param('moduleId') moduleId: string, @Body() body: UpdateSidebarModuleDto) {
+      return this.sidebarModulesService.updateModule(moduleId, body);
+    }
 
     @Get(':role')
     @ApiOperation({ summary: 'Obtener módulos del sidebar por rol' })
