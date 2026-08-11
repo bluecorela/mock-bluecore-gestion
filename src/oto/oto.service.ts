@@ -139,4 +139,37 @@ export class OtoService {
     async getHistory(teamId: string) {
         return this.supabaseDataService.getOtoHistory(teamId);
     }
+
+    async getContext(teamId: string) {
+        const [team, members, sprints, config, history] = await Promise.all([
+            this.supabaseDataService.getTeam(teamId),
+            this.supabaseDataService.getEmployeeByTeam(teamId),
+            this.supabaseDataService.getSprintsByTeam(teamId),
+            this.getConfig(),
+            this.getHistory(teamId),
+        ]);
+        if (!team) throw new NotFoundException('No existe el equipo');
+        return {
+            team,
+            members,
+            sprints: sprints.map((sprint) => ({
+                id: sprint.code,
+                name: sprint.code,
+                startDate: sprint.start_date ?? null,
+                endDate: sprint.end_date ?? null,
+                sprintClosed: sprint.sprint_closed ?? null,
+            })),
+            config,
+            history,
+        };
+    }
+
+    async getAdminOverview() {
+        const teams = await this.supabaseDataService.getTeams();
+        const teamSummaries = await Promise.all(teams.map(async (team) => {
+            const evaluations = await this.getHistory(team.id);
+            return { team, evaluations, totalEvaluations: evaluations.length };
+        }));
+        return { teams: teamSummaries };
+    }
 }

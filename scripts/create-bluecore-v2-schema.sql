@@ -1350,3 +1350,80 @@ select routine_schema, routine_name, security_type
 from information_schema.routines
 where routine_schema = 'bluecore_v2'
   and routine_name = 'save_sprint_evaluation';
+
+-- Transactional sidebar module and role configuration.
+begin;
+
+create or replace function bluecore_v2.save_sidebar_module(p_payload jsonb)
+returns uuid
+language plpgsql
+security invoker
+set search_path = bluecore_v2, public
+as $$
+declare
+  v_module_id uuid := nullif(p_payload->>'moduleId', '')::uuid;
+  v_requested_roles integer;
+  v_existing_roles integer;
+begin
+  if v_module_id is null then
+    insert into bluecore_v2.sidebar_modules (
+      code, name, route, icon, display_order, is_visible
+    ) values (
+      lower(btrim(p_payload->>'code')),
+      btrim(p_payload->>'name'),
+      btrim(p_payload->>'route'),
+      nullif(btrim(p_payload->>'icon'), ''),
+      coalesce((p_payload->>'displayOrder')::integer, 0),
+      coalesce((p_payload->>'isVisible')::boolean, true)
+    ) returning id into v_module_id;
+  else
+    perform 1 from bluecore_v2.sidebar_modules where id = v_module_id for update;
+    if not found then raise exception 'Sidebar module % does not exist', v_module_id; end if;
+
+    update bluecore_v2.sidebar_modules
+    set
+      code = case when p_payload ? 'code' then lower(btrim(p_payload->>'code')) else code end,
+      name = case when p_payload ? 'name' then btrim(p_payload->>'name') else name end,
+      route = case when p_payload ? 'route' then btrim(p_payload->>'route') else route end,
+      icon = case when p_payload ? 'icon' then nullif(btrim(p_payload->>'icon'), '') else icon end,
+      display_order = case when p_payload ? 'displayOrder' then (p_payload->>'displayOrder')::integer else display_order end,
+      is_visible = case when p_payload ? 'isVisible' then (p_payload->>'isVisible')::boolean else is_visible end,
+      updated_at = now()
+    where id = v_module_id;
+  end if;
+
+  if p_payload ? 'roleCodes' then
+    if jsonb_typeof(p_payload->'roleCodes') <> 'array' then
+      raise exception 'roleCodes must be an array';
+    end if;
+
+    select count(distinct value) into v_requested_roles
+    from jsonb_array_elements_text(p_payload->'roleCodes');
+
+    select count(*) into v_existing_roles
+    from bluecore_v2.roles role
+    where role.code in (
+      select distinct value from jsonb_array_elements_text(p_payload->'roleCodes')
+    );
+
+    if v_requested_roles <> v_existing_roles then
+      raise exception 'One or more role codes do not exist';
+    end if;
+
+    delete from bluecore_v2.sidebar_module_roles where module_id = v_module_id;
+    insert into bluecore_v2.sidebar_module_roles (module_id, role_id)
+    select v_module_id, role.id
+    from bluecore_v2.roles role
+    where role.code in (
+      select distinct value from jsonb_array_elements_text(p_payload->'roleCodes')
+    );
+  end if;
+
+  return v_module_id;
+end;
+$$;
+
+revoke all on function bluecore_v2.save_sidebar_module(jsonb) from public;
+grant execute on function bluecore_v2.save_sidebar_module(jsonb) to service_role;
+
+commit;

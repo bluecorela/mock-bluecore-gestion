@@ -200,6 +200,31 @@ export class TeamsService {
     return this.supabaseDataService.getSprintEvaluationStatus(teamId, sprintId);
   }
 
+  async getSprintBoardContext(teamId: string) {
+    const [team, members, sprints, rotationHistory, evaluationStatus] = await Promise.all([
+      this.getTeam(teamId),
+      this.supabaseDataService.getEmployeeByTeam(teamId),
+      this.getSprintsByTeam(teamId),
+      this.supabaseDataService.getRotationHistory() as Promise<RotationHistory[]>,
+      this.getSprintEvaluationStatus(teamId),
+    ]);
+    if (!team) return null;
+
+    const teamKeys = new Set([teamId, team.id, team.name].filter(Boolean));
+    const relevantRotationHistory = rotationHistory.filter((event: any) =>
+      teamKeys.has(event.fromTeam) || teamKeys.has(event.toTeam)
+      || teamKeys.has(event.sourceName) || teamKeys.has(event.destinationName),
+    );
+
+    return {
+      team,
+      members,
+      sprints,
+      rotationHistory: relevantRotationHistory,
+      evaluationStatus,
+    };
+  }
+
   async saveEvaluation(data: Partial<SaveEvaluationRequest> | undefined) {
     if (!data || typeof data !== 'object') {
       throw new BadRequestException('El cuerpo de la evaluación es obligatorio');

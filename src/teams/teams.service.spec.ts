@@ -5,7 +5,14 @@ import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 describe('TeamsService', () => {
   const operationsService = {} as OperationsService;
-  const dataService = { saveEvaluation: jest.fn() } as unknown as SupabaseDataService;
+  const dataService = {
+    saveEvaluation: jest.fn(),
+    getTeam: jest.fn(),
+    getEmployeeByTeam: jest.fn(),
+    getSprintsByTeam: jest.fn(),
+    getRotationHistory: jest.fn(),
+    getSprintEvaluationStatus: jest.fn(),
+  } as unknown as SupabaseDataService;
   const service = new TeamsService(operationsService, dataService);
 
   beforeEach(() => jest.clearAllMocks());
@@ -27,5 +34,22 @@ describe('TeamsService', () => {
     await expect(service.saveEvaluation({ teamId: 'sgb-evolucion' }))
       .rejects.toBeInstanceOf(BadRequestException);
     expect(dataService.saveEvaluation).not.toHaveBeenCalled();
+  });
+
+  it('returns the sprint board context and filters unrelated rotations', async () => {
+    jest.spyOn(dataService, 'getTeam').mockResolvedValue({ id: 'gb-web', name: 'GB Web' });
+    jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([{ id: 'employee-1' }] as any);
+    jest.spyOn(dataService, 'getSprintsByTeam').mockResolvedValue([{ code: 'sprint-1' }] as any);
+    jest.spyOn(dataService, 'getRotationHistory').mockResolvedValue([
+      { id: 'rotation-1', fromTeam: 'gb-web', toTeam: 'pool-de-vacaciones' },
+      { id: 'rotation-2', fromTeam: 'sgb-evolucion', toTeam: 'sgb-laboratorio' },
+    ] as any);
+    jest.spyOn(dataService, 'getSprintEvaluationStatus').mockResolvedValue({ sprintId: 'sprint-1' } as any);
+
+    await expect(service.getSprintBoardContext('gb-web')).resolves.toMatchObject({
+      team: { id: 'gb-web' },
+      rotationHistory: [{ id: 'rotation-1' }],
+      evaluationStatus: { sprintId: 'sprint-1' },
+    });
   });
 });

@@ -61,6 +61,16 @@ export class TeamsController {
     return data;
   }
 
+  @Get(':teamId/sprint-board-context')
+  @ApiOperation({ summary: 'Obtener equipo, integrantes, rotaciones, sprints y estado de evaluación' })
+  @ApiResponse({ status: 200, description: 'Contexto consolidado del cuadro de sprints' })
+  @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
+  async getSprintBoardContext(@Param('teamId') teamId: string) {
+    const context = await this.teamsService.getSprintBoardContext(teamId);
+    if (!context) throw new NotFoundException('No existe el equipo');
+    return context;
+  }
+
 
   @Get(':teamId/sprints')
   @ApiParam({

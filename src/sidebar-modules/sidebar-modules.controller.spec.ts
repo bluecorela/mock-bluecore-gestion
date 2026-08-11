@@ -14,4 +14,16 @@ describe('SidebarModulesController', () => {
     await expect(controller.getModulesByRole('Admin', user)).resolves.toEqual(modules);
     expect(service.getModulesByRole).toHaveBeenCalledWith('Admin');
   });
+
+  it('passes the module ID when updating sidebar configuration', async () => {
+    const updated = { id: 'module-id', name: 'New name' };
+    const service = {
+      updateModule: jest.fn().mockResolvedValue(updated),
+    } as unknown as SidebarModulesService;
+    const controller = new SidebarModulesController(service);
+
+    await expect(controller.updateModule('module-id', { name: 'New name' }))
+      .resolves.toEqual(updated);
+    expect(service.updateModule).toHaveBeenCalledWith('module-id', { name: 'New name' });
+  });
 });

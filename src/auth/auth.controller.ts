@@ -7,11 +7,21 @@ import type { AuthenticatedUser } from './interfaces/auth-user.interface';
 import { AdminGuard } from './admin.guard';
 import { CreateAuthUserDto } from './dto/create-auth-user.dto';
 import { UpdateAuthUserDto } from './dto/update-auth-user.dto';
+import { LoginDto } from './dto/login.dto';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post('login')
+  @ApiOperation({ summary: 'Obtener token para probar la API desde Swagger (solo desarrollo y pruebas)' })
+  @ApiResponse({ status: 201, description: 'Token de acceso generado' })
+  @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
+  @ApiResponse({ status: 404, description: 'Endpoint deshabilitado en producción' })
+  login(@Body() body: LoginDto) {
+    return this.authService.loginForApiDocumentation(body);
+  }
 
   @Get('validate')
   @ApiBearerAuth()
@@ -30,6 +40,15 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Token inválido o ausente' })
   me(@CurrentUser() user: AuthenticatedUser) {
     return user;
+  }
+
+  @Get('bootstrap')
+  @UseGuards(AuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener usuario, módulos del sidebar y estado de mantenimiento' })
+  @ApiResponse({ status: 200, description: 'Contexto inicial de la aplicación' })
+  bootstrap(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.getBootstrap(user);
   }
 
   @Get('users')

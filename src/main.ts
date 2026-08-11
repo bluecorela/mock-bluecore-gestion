@@ -41,12 +41,21 @@ async function bootstrap() {
     .setTitle('APIs de Portal de Gestión')
     .setDescription('Documentación de los endpoints')
     .setVersion('1.0')
-    .addBearerAuth()
+    .addBearerAuth({
+      type: 'http',
+      scheme: 'bearer',
+      bearerFormat: 'JWT',
+      description: 'Access token de una sesión autenticada en Supabase',
+    })
     .build();
 
   if (configService.get<string>('SWAGGER_ENABLED') !== 'false') {
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+      },
+    });
   }
 
   const port = configService.get<number>('PORT', 3000);

@@ -23,6 +23,22 @@ export class OtoController {
         return this.otoService.getConfig();
     }
 
+    @Get('admin-overview')
+    @UseGuards(AuthGuard, AdminGuard)
+    @ApiOperation({ summary: 'Obtener equipos e historial One to One para revisión administrativa' })
+    getAdminOverview() {
+        return this.otoService.getAdminOverview();
+    }
+
+    @Get('context/:teamId')
+    @UseGuards(AuthGuard, RolesGuard)
+    @Roles('Admin', 'Arquitecto')
+    @ApiOperation({ summary: 'Obtener contexto consolidado para evaluación One to One' })
+    getContext(@Param('teamId') teamId: string) {
+        if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+        return this.otoService.getContext(teamId);
+    }
+
     @Post('seed')
     @UseGuards(AuthGuard, AdminGuard)
     @ApiOperation({ summary: 'Importar configuración inicial de One to One a Supabase (ejecutar una sola vez)' })

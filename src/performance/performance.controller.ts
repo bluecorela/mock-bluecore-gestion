@@ -24,6 +24,22 @@ export class PerformanceController {
         return this.performanceService.getConfig();
     }
 
+    @Get('admin-overview')
+    @UseGuards(AuthGuard, AdminGuard)
+    @ApiOperation({ summary: 'Obtener equipos, habilitaciones, miembros e historial para revisión administrativa' })
+    getAdminOverview() {
+        return this.performanceService.getAdminOverview();
+    }
+
+    @Get('context/:teamId')
+    @UseGuards(AuthGuard, RolesGuard)
+    @Roles('Admin', 'Arquitecto')
+    @ApiOperation({ summary: 'Obtener contexto consolidado para evaluación de desempeño' })
+    getContext(@Param('teamId') teamId: string) {
+        if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+        return this.performanceService.getContext(teamId);
+    }
+
     @Post('seed')
     @UseGuards(AuthGuard, AdminGuard)
     @ApiOperation({ summary: 'Importar configuración inicial de preguntas a Supabase' })
