@@ -1,9 +1,18 @@
 services:
   api:
     build: .
+    pull_policy: build
     container_name: bluecore-gestion
     restart: unless-stopped
-    env_file:
-      - .env
+    environment:
+      TZ: America/Panama
+      PORT: ${PORT}
+      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
+      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
+      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
+      FIREBASE_EMAIL: ${FIREBASE_EMAIL}
+      FIREBASE_PASSWORD: ${FIREBASE_PASSWORD}
     ports:
       - "3000:3000"
