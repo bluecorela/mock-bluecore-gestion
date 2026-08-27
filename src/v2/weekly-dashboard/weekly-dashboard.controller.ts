@@ -1,18 +1,33 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { WeeklyDashboardV2Service } from './weekly-dashboard-v2.service';
-import { SaveWeeklyReportV2Dto } from './dto/save-weekly-report.dto';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
+import { WeeklyDashboardService } from './weekly-dashboard.service';
+import { SaveWeeklyReportDto } from './dto/save-weekly-report.dto';
 import { AuthGuard } from '../../auth/auth.guard';
 import { RolesGuard } from '../../auth/roles.guard';
 import { Roles } from '../../auth/roles.decorator';
-import { WeeklyReportContextQueryV2Dto } from './dto/weekly-report-context-query.dto';
+import { WeeklyReportContextQueryDto } from './dto/weekly-report-context-query.dto';
 
-@ApiTags('Weekly dashboard v2')
+@ApiTags('Weekly dashboard')
 @Controller('v2/teams/:teamId/weekly-reports')
 @UseGuards(AuthGuard)
 @ApiBearerAuth()
-export class WeeklyDashboardV2Controller {
-  constructor(private readonly service: WeeklyDashboardV2Service) {}
+export class WeeklyDashboardController {
+  constructor(private readonly service: WeeklyDashboardService) {}
 
   @Get()
   @ApiOperation({ summary: 'List the weekly dashboard history for a team' })
@@ -22,11 +37,19 @@ export class WeeklyDashboardV2Controller {
   }
 
   @Get('context')
-  @ApiOperation({ summary: 'Get projects, responsible members and sprints for a selected week' })
-  @ApiQuery({ name: 'weekStart', required: false, type: String, example: '2026-08-03' })
+  @ApiOperation({
+    summary:
+      'Get projects, responsible members and sprints for a selected week',
+  })
+  @ApiQuery({
+    name: 'weekStart',
+    required: false,
+    type: String,
+    example: '2026-08-03',
+  })
   findContext(
     @Param('teamId', new ParseUUIDPipe()) teamId: string,
-    @Query() query: WeeklyReportContextQueryV2Dto,
+    @Query() query: WeeklyReportContextQueryDto,
   ) {
     return this.service.findContext(teamId, query.weekStart);
   }
@@ -41,13 +64,16 @@ export class WeeklyDashboardV2Controller {
   })
   saveReport(
     @Param('teamId', new ParseUUIDPipe()) teamId: string,
-    @Body() input: SaveWeeklyReportV2Dto,
+    @Body() input: SaveWeeklyReportDto,
   ) {
     return this.service.saveReport(teamId, input);
   }
 
   @Get(':reportId')
-  @ApiOperation({ summary: 'Get a weekly dashboard report with initiatives, risks and quality metrics' })
+  @ApiOperation({
+    summary:
+      'Get a weekly dashboard report with initiatives, risks and quality metrics',
+  })
   findReport(
     @Param('teamId', new ParseUUIDPipe()) teamId: string,
     @Param('reportId', new ParseUUIDPipe()) reportId: string,

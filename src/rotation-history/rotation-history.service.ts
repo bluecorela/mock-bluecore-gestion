@@ -3,7 +3,7 @@ import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class RotationHistoryService {
-  constructor(private readonly supabaseDataService: SupabaseDataService) { }
+  constructor(private readonly supabaseDataService: SupabaseDataService) {}
 
   async findAll() {
     const history = await this.supabaseDataService.getRotationHistory();

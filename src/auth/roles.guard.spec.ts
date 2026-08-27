@@ -15,13 +15,18 @@ describe('RolesGuard', () => {
   }
 
   it('allows a configured role', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['Admin', 'Arquitecto']);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue(['Admin', 'Arquitecto']);
     expect(guard.canActivate(context('Arquitecto'))).toBe(true);
   });
 
   it('rejects a role that is not configured', () => {
-    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(['Admin', 'Arquitecto']);
-    expect(() => guard.canActivate(context('Ingeniero de Software')))
-      .toThrow(ForbiddenException);
+    jest
+      .spyOn(reflector, 'getAllAndOverride')
+      .mockReturnValue(['Admin', 'Arquitecto']);
+    expect(() => guard.canActivate(context('Ingeniero de Software'))).toThrow(
+      ForbiddenException,
+    );
   });
 });

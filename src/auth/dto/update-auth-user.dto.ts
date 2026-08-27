@@ -1,13 +1,27 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+import { AUTH_ROLES, type AuthRole } from '../auth.constants';
 
 export class UpdateAuthUserDto {
-  @ApiPropertyOptional({ description: 'Nombre del usuario', example: 'Juan Pérez' })
+  @ApiPropertyOptional({
+    description: 'Nombre del usuario',
+    example: 'Juan Pérez',
+  })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Correo electrónico', example: 'juan@example.com' })
+  @ApiPropertyOptional({
+    description: 'Correo electrónico',
+    example: 'juan@example.com',
+  })
   @IsOptional()
   @IsEmail()
   email?: string;
@@ -24,13 +38,13 @@ export class UpdateAuthUserDto {
 
   @ApiPropertyOptional({
     description: 'Rol del usuario',
-    enum: ['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'],
+    enum: [...AUTH_ROLES],
     example: 'Ingeniero de Software',
   })
   @IsOptional()
   @IsString()
-  @IsIn(['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'])
-  role?: string;
+  @IsIn([...AUTH_ROLES])
+  role?: AuthRole;
 
   @ApiPropertyOptional({
     description: 'ID del equipo. Enviar null para quitar equipo.',
@@ -38,6 +52,7 @@ export class UpdateAuthUserDto {
     nullable: true,
   })
   @IsOptional()
+  @IsString()
   teamId?: string | null;
 
   @ApiPropertyOptional({
@@ -51,7 +66,8 @@ export class UpdateAuthUserDto {
   status?: 'activo' | 'inactivo';
 
   @ApiPropertyOptional({
-    description: 'Confirmar automáticamente el correo si se cambia en Supabase Auth',
+    description:
+      'Confirmar automáticamente el correo si se cambia en Supabase Auth',
     default: true,
   })
   @IsOptional()
@@ -59,7 +75,8 @@ export class UpdateAuthUserDto {
   emailConfirm?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Enviar correo con contraseña temporal si se actualiza la contraseña',
+    description:
+      'Enviar correo con contraseña temporal si se actualiza la contraseña',
     default: true,
   })
   @IsOptional()

@@ -16,7 +16,9 @@ describe('PersonnelController', () => {
     };
     const user = { supabaseUserId: 'auth-user-id' } as AuthenticatedUser;
 
-    await expect(controller.create(dto, user)).resolves.toEqual({ id: 'employee-id' });
+    await expect(controller.create(dto, user)).resolves.toEqual({
+      id: 'employee-id',
+    });
     expect(personnelService.create).toHaveBeenCalledWith(dto, 'auth-user-id');
   });
 });

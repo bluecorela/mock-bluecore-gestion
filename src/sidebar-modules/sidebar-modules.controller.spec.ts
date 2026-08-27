@@ -11,7 +11,9 @@ describe('SidebarModulesController', () => {
     const controller = new SidebarModulesController(service);
 
     const user = { role: 'Admin' } as AuthenticatedUser;
-    await expect(controller.getModulesByRole('Admin', user)).resolves.toEqual(modules);
+    await expect(controller.getModulesByRole('Admin', user)).resolves.toEqual(
+      modules,
+    );
     expect(service.getModulesByRole).toHaveBeenCalledWith('Admin');
   });
 
@@ -22,8 +24,11 @@ describe('SidebarModulesController', () => {
     } as unknown as SidebarModulesService;
     const controller = new SidebarModulesController(service);
 
-    await expect(controller.updateModule('module-id', { name: 'New name' }))
-      .resolves.toEqual(updated);
-    expect(service.updateModule).toHaveBeenCalledWith('module-id', { name: 'New name' });
+    await expect(
+      controller.updateModule('module-id', { name: 'New name' }),
+    ).resolves.toEqual(updated);
+    expect(service.updateModule).toHaveBeenCalledWith('module-id', {
+      name: 'New name',
+    });
   });
 });

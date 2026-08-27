@@ -15,7 +15,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export class WeeklyInitiativeV2Dto {
+export class WeeklyInitiativeDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
@@ -52,7 +52,7 @@ export class WeeklyInitiativeV2Dto {
   ownerId?: string;
 }
 
-export class WeeklyRiskV2Dto {
+export class WeeklyRiskDto {
   @IsOptional()
   @IsUUID()
   projectId?: string;
@@ -83,12 +83,15 @@ export class WeeklyRiskV2Dto {
   @IsDateString()
   dueDate?: string;
 
-  @ValidateIf((risk: WeeklyRiskV2Dto) => risk.status === 'resolved' || risk.resolvedAt !== undefined)
+  @ValidateIf(
+    (risk: WeeklyRiskDto) =>
+      risk.status === 'resolved' || risk.resolvedAt !== undefined,
+  )
   @IsDateString()
   resolvedAt?: string;
 }
 
-export class WeeklyQualityV2Dto {
+export class WeeklyQualityDto {
   @IsInt()
   @Min(0)
   defectsFound!: number;
@@ -110,7 +113,7 @@ export class WeeklyQualityV2Dto {
   recordedAt?: string;
 }
 
-export class SaveWeeklyReportV2Dto {
+export class SaveWeeklyReportDto {
   @IsUUID()
   projectId!: string;
 
@@ -155,15 +158,15 @@ export class SaveWeeklyReportV2Dto {
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => WeeklyInitiativeV2Dto)
-  initiatives!: WeeklyInitiativeV2Dto[];
+  @Type(() => WeeklyInitiativeDto)
+  initiatives!: WeeklyInitiativeDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => WeeklyRiskV2Dto)
-  risks!: WeeklyRiskV2Dto[];
+  @Type(() => WeeklyRiskDto)
+  risks!: WeeklyRiskDto[];
 
   @ValidateNested()
-  @Type(() => WeeklyQualityV2Dto)
-  quality!: WeeklyQualityV2Dto;
+  @Type(() => WeeklyQualityDto)
+  quality!: WeeklyQualityDto;
 }

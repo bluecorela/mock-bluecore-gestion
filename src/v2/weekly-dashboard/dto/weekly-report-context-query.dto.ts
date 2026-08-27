@@ -1,6 +1,6 @@
 import { IsDateString, IsOptional } from 'class-validator';
 
-export class WeeklyReportContextQueryV2Dto {
+export class WeeklyReportContextQueryDto {
   @IsOptional()
   @IsDateString()
   weekStart?: string;

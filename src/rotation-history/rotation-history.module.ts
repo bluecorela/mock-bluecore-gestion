@@ -9,4 +9,4 @@ import { AuthModule } from '../auth/auth.module';
   providers: [RotationHistoryService],
   controllers: [RotationHistoryController],
 })
-export class RotationHistoryModule { }
+export class RotationHistoryModule {}

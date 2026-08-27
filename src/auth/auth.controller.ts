@@ -1,5 +1,20 @@
-import { Body, Controller, Get, Headers, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -15,10 +30,16 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  @ApiOperation({ summary: 'Obtener token para probar la API desde Swagger (solo desarrollo y pruebas)' })
+  @ApiOperation({
+    summary:
+      'Obtener token para probar la API desde Swagger (solo desarrollo y pruebas)',
+  })
   @ApiResponse({ status: 201, description: 'Token de acceso generado' })
   @ApiResponse({ status: 401, description: 'Credenciales inválidas' })
-  @ApiResponse({ status: 404, description: 'Endpoint deshabilitado en producción' })
+  @ApiResponse({
+    status: 404,
+    description: 'Endpoint deshabilitado en producción',
+  })
   login(@Body() body: LoginDto) {
     return this.authService.loginForApiDocumentation(body);
   }
@@ -45,8 +66,13 @@ export class AuthController {
   @Get('bootstrap')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Obtener usuario, módulos del sidebar y estado de mantenimiento' })
-  @ApiResponse({ status: 200, description: 'Contexto inicial de la aplicación' })
+  @ApiOperation({
+    summary: 'Obtener usuario, módulos del sidebar y estado de mantenimiento',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Contexto inicial de la aplicación',
+  })
   bootstrap(@CurrentUser() user: AuthenticatedUser) {
     return this.authService.getBootstrap(user);
   }
@@ -60,6 +86,14 @@ export class AuthController {
   @ApiResponse({ status: 403, description: 'Solo administradores' })
   getUsers() {
     return this.authService.getUsers();
+  }
+
+  @Get('users/context')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Obtener usuarios y equipos para administración' })
+  getUsersContext() {
+    return this.authService.getUsersContext();
   }
 
   @Get('users/:id')
@@ -92,7 +126,9 @@ export class AuthController {
   @Patch('password/change-completed')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Marcar cambio de contraseña inicial como completado' })
+  @ApiOperation({
+    summary: 'Marcar cambio de contraseña inicial como completado',
+  })
   @ApiResponse({ status: 200, description: 'Cambio marcado como completado' })
   @ApiResponse({ status: 401, description: 'Token inválido o ausente' })
   markPasswordChanged(@CurrentUser() user: AuthenticatedUser) {
@@ -112,7 +148,11 @@ export class AuthController {
     @Body() body: UpdateAuthUserDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    const result = await this.authService.updateUser(id, body, currentUser.supabaseUserId);
+    const result = await this.authService.updateUser(
+      id,
+      body,
+      currentUser.supabaseUserId,
+    );
 
     if (!result) {
       throw new NotFoundException('Usuario no encontrado');

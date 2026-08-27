@@ -126,6 +126,10 @@ export interface RotationHistory {
   personnelId?: string;
   type?: string;
   date?: string | Date;
+  fromTeam?: string | null;
+  sourceName?: string | null;
+  toTeam?: string | null;
+  destinationName?: string | null;
 }
 
 export interface TeamSprintResponse {

@@ -1,16 +1,28 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MinLength,
+} from 'class-validator';
+import { AUTH_ROLES, type AuthRole } from '../auth.constants';
 
 export class CreateAuthUserDto {
   @ApiProperty({ description: 'Nombre del usuario', example: 'Juan Pérez' })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
-  @ApiProperty({ description: 'Correo electrónico', example: 'juan@example.com' })
+  @ApiProperty({
+    description: 'Correo electrónico',
+    example: 'juan@example.com',
+  })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     description: 'Contraseña temporal o definitiva',
@@ -19,17 +31,17 @@ export class CreateAuthUserDto {
   })
   @IsString()
   @MinLength(8)
-  password: string;
+  password!: string;
 
   @ApiProperty({
     description: 'Rol del usuario',
-    enum: ['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'],
+    enum: [...AUTH_ROLES],
     example: 'Ingeniero de Software',
   })
   @IsString()
   @IsNotEmpty()
-  @IsIn(['Admin', 'Arquitecto', 'Scrum Master', 'Ingeniero de Software', 'Ingeniero de QA', 'Creador de Bienestar', 'Pasante'])
-  role: string;
+  @IsIn([...AUTH_ROLES])
+  role!: AuthRole;
 
   @ApiProperty({
     description: 'ID del equipo',

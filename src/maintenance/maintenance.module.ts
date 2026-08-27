@@ -4,9 +4,9 @@ import { MaintenanceService } from './maintenance.service';
 import { SupabaseModule } from '../supabase/supabase.module';
 
 @Module({
-    imports: [SupabaseModule],
-    controllers: [MaintenanceController],
-    providers: [MaintenanceService],
-    exports: [MaintenanceService],
+  imports: [SupabaseModule],
+  controllers: [MaintenanceController],
+  providers: [MaintenanceService],
+  exports: [MaintenanceService],
 })
-export class MaintenanceModule { }
+export class MaintenanceModule {}

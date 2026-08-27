@@ -11,14 +11,21 @@ describe('PersonnelService', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('creates personnel with the authenticated administrator as creator', async () => {
-    jest.spyOn(dataService, 'createPersonnel').mockResolvedValue({ id: 'employee-id' });
+    jest
+      .spyOn(dataService, 'createPersonnel')
+      .mockResolvedValue({ id: 'employee-id' });
 
-    await expect(service.create({
-      name: 'Ana Pérez',
-      email: 'ana@bluecorela.com',
-      role: 'Ingeniero de Software',
-      teamId: 'gb-web',
-    }, 'auth-user-id')).resolves.toEqual({ id: 'employee-id' });
+    await expect(
+      service.create(
+        {
+          name: 'Ana Pérez',
+          email: 'ana@bluecorela.com',
+          role: 'Ingeniero de Software',
+          teamId: 'gb-web',
+        },
+        'auth-user-id',
+      ),
+    ).resolves.toEqual({ id: 'employee-id' });
 
     expect(dataService.createPersonnel).toHaveBeenCalledWith({
       name: 'Ana Pérez',
@@ -30,15 +37,19 @@ describe('PersonnelService', () => {
   });
 
   it('rejects an engineer without a team', async () => {
-    await expect(service.create({
-      name: 'Ana Pérez',
-      email: 'ana@bluecorela.com',
-      role: 'Ingeniero de QA',
-    })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create({
+        name: 'Ana Pérez',
+        email: 'ana@bluecorela.com',
+        role: 'Ingeniero de QA',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('allows project-level roles without a team', async () => {
-    jest.spyOn(dataService, 'createPersonnel').mockResolvedValue({ id: 'architect-id' });
+    jest
+      .spyOn(dataService, 'createPersonnel')
+      .mockResolvedValue({ id: 'architect-id' });
 
     await service.create({
       name: 'Ana Pérez',

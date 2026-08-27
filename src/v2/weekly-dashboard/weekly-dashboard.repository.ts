@@ -1,19 +1,29 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { SupabaseClient } from '../../supabase/supabase.client';
 
 @Injectable()
-export class WeeklyDashboardV2Repository {
+export class WeeklyDashboardRepository {
   constructor(private readonly supabaseClient: SupabaseClient) {}
 
   async teamExists(teamId: string): Promise<boolean> {
-    const { data, error } = await this.supabaseClient.getV2Client().from('teams')
-      .select('id').eq('id', teamId).is('deleted_at', null).maybeSingle();
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('teams')
+      .select('id')
+      .eq('id', teamId)
+      .is('deleted_at', null)
+      .maybeSingle();
     if (error) this.throwDatabaseError('team', error);
     return Boolean(data);
   }
 
   async findReports(teamId: string) {
-    const { data, error } = await this.supabaseClient.getV2Client()
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
       .from('team_weekly_reports')
       .select('*')
       .eq('team_id', teamId)
@@ -23,9 +33,12 @@ export class WeeklyDashboardV2Repository {
   }
 
   async findSprintsForWeek(teamId: string, weekStart: string, weekEnd: string) {
-    const { data, error } = await this.supabaseClient.getV2Client()
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
       .from('sprints')
-      .select('id,project_id,sprint_number,name,start_date,end_date,status,committed_points,completed_points,wip_stories')
+      .select(
+        'id,project_id,sprint_number,name,start_date,end_date,status,committed_points,completed_points,wip_stories',
+      )
       .eq('team_id', teamId)
       .lte('start_date', weekEnd)
       .gte('end_date', weekStart)
@@ -57,13 +70,27 @@ export class WeeklyDashboardV2Repository {
     if (!report) return null;
 
     const [initiatives, risks, quality] = await Promise.all([
-      database.from('team_initiatives').select('*').eq('weekly_report_id', reportId).order('created_at'),
-      database.from('team_risks').select('*').eq('weekly_report_id', reportId).order('created_at'),
-      database.from('quality_metrics').select('*').eq('weekly_report_id', reportId).order('recorded_at'),
+      database
+        .from('team_initiatives')
+        .select('*')
+        .eq('weekly_report_id', reportId)
+        .order('created_at'),
+      database
+        .from('team_risks')
+        .select('*')
+        .eq('weekly_report_id', reportId)
+        .order('created_at'),
+      database
+        .from('quality_metrics')
+        .select('*')
+        .eq('weekly_report_id', reportId)
+        .order('recorded_at'),
     ]);
-    if (initiatives.error) this.throwDatabaseError('initiatives', initiatives.error);
+    if (initiatives.error)
+      this.throwDatabaseError('initiatives', initiatives.error);
     if (risks.error) this.throwDatabaseError('risks', risks.error);
-    if (quality.error) this.throwDatabaseError('quality metrics', quality.error);
+    if (quality.error)
+      this.throwDatabaseError('quality metrics', quality.error);
 
     return {
       ...this.mapReport(report),
@@ -103,7 +130,8 @@ export class WeeklyDashboardV2Repository {
   }
 
   async saveReport(payload: Record<string, unknown>): Promise<string> {
-    const { data, error } = await this.supabaseClient.getV2Client()
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
       .rpc('save_weekly_report', { p_payload: payload });
     if (error) {
       if (['22P02', '23503', '23514', 'P0001'].includes(error.code ?? '')) {
@@ -140,7 +168,10 @@ export class WeeklyDashboardV2Repository {
     };
   }
 
-  private throwDatabaseError(resource: string, error: { message?: string }): never {
+  private throwDatabaseError(
+    resource: string,
+    error: { message?: string },
+  ): never {
     throw new InternalServerErrorException(
       `Could not read ${resource} from the v2 database: ${error.message || 'unknown error'}`,
     );

@@ -5,9 +5,9 @@ import { SupabaseModule } from '../supabase/supabase.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-    imports: [SupabaseModule, AuthModule],
-    controllers: [PerformanceController],
-    providers: [PerformanceService],
-    exports: [PerformanceService],
+  imports: [SupabaseModule, AuthModule],
+  controllers: [PerformanceController],
+  providers: [PerformanceService],
+  exports: [PerformanceService],
 })
-export class PerformanceModule { }
+export class PerformanceModule {}

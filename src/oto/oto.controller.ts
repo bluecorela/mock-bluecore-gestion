@@ -1,7 +1,20 @@
-import { Controller, Post, Get, Body, Param, BadRequestException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Param,
+  BadRequestException,
+  UseGuards,
+} from '@nestjs/common';
 import { OtoService } from './oto.service';
 import { CreateOtoEvaluationDto } from './dto/create-oto-evaluation.dto';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AuthGuard } from '../auth/auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -14,54 +27,69 @@ import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 @UseGuards(AuthGuard)
 @ApiBearerAuth()
 export class OtoController {
-    constructor(private readonly otoService: OtoService) { }
+  constructor(private readonly otoService: OtoService) {}
 
-    @Get('config')
-    @ApiOperation({ summary: 'Obtener configuración de secciones y preguntas de One to One' })
-    @ApiResponse({ status: 200, description: 'Configuración obtenida con éxito' })
-    async getConfig() {
-        return this.otoService.getConfig();
-    }
+  @Get('config')
+  @ApiOperation({
+    summary: 'Obtener configuración de secciones y preguntas de One to One',
+  })
+  @ApiResponse({ status: 200, description: 'Configuración obtenida con éxito' })
+  async getConfig() {
+    return this.otoService.getConfig();
+  }
 
-    @Get('admin-overview')
-    @UseGuards(AuthGuard, AdminGuard)
-    @ApiOperation({ summary: 'Obtener equipos e historial One to One para revisión administrativa' })
-    getAdminOverview() {
-        return this.otoService.getAdminOverview();
-    }
+  @Get('admin-overview')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiOperation({
+    summary:
+      'Obtener equipos e historial One to One para revisión administrativa',
+  })
+  getAdminOverview() {
+    return this.otoService.getAdminOverview();
+  }
 
-    @Get('context/:teamId')
-    @UseGuards(AuthGuard, RolesGuard)
-    @Roles('Admin', 'Arquitecto')
-    @ApiOperation({ summary: 'Obtener contexto consolidado para evaluación One to One' })
-    getContext(@Param('teamId') teamId: string) {
-        if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
-        return this.otoService.getContext(teamId);
-    }
+  @Get('context/:teamId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('Admin', 'Arquitecto')
+  @ApiOperation({
+    summary: 'Obtener contexto consolidado para evaluación One to One',
+  })
+  getContext(@Param('teamId') teamId: string) {
+    if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    return this.otoService.getContext(teamId);
+  }
 
-    @Post('seed')
-    @UseGuards(AuthGuard, AdminGuard)
-    @ApiOperation({ summary: 'Importar configuración inicial de One to One a Supabase (ejecutar una sola vez)' })
-    @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
-    async seedConfig() {
-        return this.otoService.seedConfig();
-    }
+  @Post('seed')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiOperation({
+    summary:
+      'Importar configuración inicial de One to One a Supabase (ejecutar una sola vez)',
+  })
+  @ApiResponse({ status: 201, description: 'Semilla ejecutada con éxito' })
+  async seedConfig() {
+    return this.otoService.seedConfig();
+  }
 
-    @Post()
-    @UseGuards(AuthGuard, RolesGuard)
-    @Roles('Admin', 'Arquitecto')
-    @ApiOperation({ summary: 'Guardar una evaluación One to One' })
-    @ApiResponse({ status: 201, description: 'Evaluación guardada' })
-    async save(@Body() data: CreateOtoEvaluationDto, @CurrentUser() user: AuthenticatedUser) {
-        return this.otoService.save({ ...data, evaluatorName: user.name! });
-    }
+  @Post()
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('Admin', 'Arquitecto')
+  @ApiOperation({ summary: 'Guardar una evaluación One to One' })
+  @ApiResponse({ status: 201, description: 'Evaluación guardada' })
+  async save(
+    @Body() data: CreateOtoEvaluationDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.otoService.save({ ...data, evaluatorName: user.name! });
+  }
 
-    @Get('history/:teamId')
-    @UseGuards(AuthGuard, RolesGuard)
-    @Roles('Admin', 'Arquitecto')
-    @ApiOperation({ summary: 'Obtener historial de evaluaciones One to One por equipo' })
-    async getHistory(@Param('teamId') teamId: string) {
-        if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
-        return this.otoService.getHistory(teamId);
-    }
+  @Get('history/:teamId')
+  @UseGuards(AuthGuard, RolesGuard)
+  @Roles('Admin', 'Arquitecto')
+  @ApiOperation({
+    summary: 'Obtener historial de evaluaciones One to One por equipo',
+  })
+  async getHistory(@Param('teamId') teamId: string) {
+    if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    return this.otoService.getHistory(teamId);
+  }
 }

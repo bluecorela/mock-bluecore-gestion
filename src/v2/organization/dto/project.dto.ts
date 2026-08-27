@@ -1,7 +1,16 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsDateString, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
+import {
+  IsDateString,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
-export class CreateProjectV2Dto {
+export class CreateProjectDto {
   @IsUUID()
   clientId!: string;
 
@@ -38,4 +47,4 @@ export class CreateProjectV2Dto {
   actualEndDate?: string;
 }
 
-export class UpdateProjectV2Dto extends PartialType(CreateProjectV2Dto) {}
+export class UpdateProjectDto extends PartialType(CreateProjectDto) {}
