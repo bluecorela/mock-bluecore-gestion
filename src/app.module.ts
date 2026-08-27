@@ -13,9 +13,13 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
-import { OrganizationV2Module } from './v2/organization/organization-v2.module';
-import { WeeklyDashboardV2Module } from './v2/weekly-dashboard/weekly-dashboard-v2.module';
-import { environmentFilePaths, validateEnvironment } from './config/environment';
+import { OrganizationModule } from './v2/organization/organization.module';
+import { WeeklyDashboardModule } from './v2/weekly-dashboard/weekly-dashboard.module';
+import { SprintsModule } from './v2/sprints/sprints.module';
+import {
+  environmentFilePaths,
+  validateEnvironment,
+} from './config/environment';
 
 @Module({
   imports: [
@@ -36,10 +40,11 @@ import { environmentFilePaths, validateEnvironment } from './config/environment'
     MaintenanceModule,
     SupabaseModule,
     AuthModule,
-    OrganizationV2Module,
-    WeeklyDashboardV2Module,
+    OrganizationModule,
+    WeeklyDashboardModule,
+    SprintsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}

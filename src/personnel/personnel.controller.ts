@@ -1,6 +1,21 @@
-import { Controller, Get, Post, Body, Query, BadRequestException, NotFoundException, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  BadRequestException,
+  NotFoundException,
+  UseGuards,
+} from '@nestjs/common';
 import { PersonnelService } from './personnel.service';
-import { ApiOperation, ApiTags, ApiQuery, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiQuery,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { CreatePersonnelDto } from './dto/create-personnel.dto';
 import { AuthGuard } from '../auth/auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
@@ -12,16 +27,25 @@ import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 @UseGuards(AuthGuard)
 @ApiBearerAuth()
 export class PersonnelController {
-  constructor(private readonly personnelService: PersonnelService) { }
+  constructor(private readonly personnelService: PersonnelService) {}
 
   @Post()
   @UseGuards(AuthGuard, AdminGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Crear un nuevo miembro del personal' })
   @ApiResponse({ status: 201, description: 'Miembro creado exitosamente' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o validación de negocio fallida' })
-  async create(@Body() createPersonnelDto: CreatePersonnelDto, @CurrentUser() user: AuthenticatedUser) {
-    return await this.personnelService.create(createPersonnelDto, user.supabaseUserId);
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o validación de negocio fallida',
+  })
+  async create(
+    @Body() createPersonnelDto: CreatePersonnelDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return await this.personnelService.create(
+      createPersonnelDto,
+      user.supabaseUserId,
+    );
   }
 
   @Get()
@@ -33,13 +57,13 @@ export class PersonnelController {
     example: 'ccharpentier@bluecorela.com',
     description: 'Correo del usuario',
   })
-
   @ApiResponse({ status: 200, description: 'Usuario encontrado' })
-  @ApiResponse({ status: 400, description: 'El correo del usuario es obligatorio' })
+  @ApiResponse({
+    status: 400,
+    description: 'El correo del usuario es obligatorio',
+  })
   @ApiResponse({ status: 404, description: 'Usuario no encontrado' })
-
   async find(@Query('email') email?: string) {
-
     if (!email) {
       throw new BadRequestException('El parámetro "correo" es obligatorio');
     }
@@ -60,9 +84,11 @@ export class PersonnelController {
     example: 'sgb-evolucion',
     description: 'ID del equipo',
   })
-  @ApiResponse({ status: 200, description: 'Personal del equipo encontrado (puede ser un array vacío)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Personal del equipo encontrado (puede ser un array vacío)',
+  })
   @ApiResponse({ status: 400, description: 'El ID del equipo es obligatorio' })
-
   async findByTeam(@Query('teamId') teamId?: string) {
     if (!teamId) {
       throw new BadRequestException('El parámetro "equipoId" es obligatorio');
@@ -86,7 +112,6 @@ export class PersonnelController {
   @ApiResponse({ status: 500, description: 'Error interno del servidor' })
   @ApiResponse({ status: 404, description: 'No se encontró personal' })
   async findAll() {
-
     const personnel = await this.personnelService.findAll();
 
     if (!personnel) {
@@ -94,6 +119,5 @@ export class PersonnelController {
     }
 
     return personnel;
-
   }
 }

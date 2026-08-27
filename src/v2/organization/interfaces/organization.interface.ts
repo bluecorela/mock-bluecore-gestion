@@ -1,7 +1,12 @@
 export type RecordStatus = 'active' | 'inactive';
-export type ProjectStatus = 'planned' | 'active' | 'on_hold' | 'completed' | 'cancelled';
+export type ProjectStatus =
+  | 'planned'
+  | 'active'
+  | 'on_hold'
+  | 'completed'
+  | 'cancelled';
 
-export interface ClientV2 {
+export interface Client {
   id: string;
   code: string;
   name: string;
@@ -11,7 +16,7 @@ export interface ClientV2 {
   deletedAt: string | null;
 }
 
-export interface ProjectV2 {
+export interface Project {
   id: string;
   clientId: string;
   code: string;
@@ -26,7 +31,7 @@ export interface ProjectV2 {
   deletedAt: string | null;
 }
 
-export interface TeamV2 {
+export interface Team {
   id: string;
   code: string;
   name: string;
@@ -37,49 +42,49 @@ export interface TeamV2 {
   deletedAt: string | null;
 }
 
-export interface TeamProjectV2 {
+export interface TeamProject {
   id: string;
   isPrimary: boolean;
   startedAt: string;
   endedAt: string | null;
-  project: ProjectV2 & { client: ClientV2 };
-  members: TeamProjectMemberV2[];
+  project: Project & { client: Client };
+  members: TeamProjectMember[];
 }
 
-export interface EmployeeSummaryV2 {
+export interface EmployeeSummary {
   id: string;
   employeeCode: string | null;
   fullName: string;
   email: string;
 }
 
-export interface RoleV2 {
+export interface Role {
   id: string;
   code: string;
   name: string;
 }
 
-export interface TeamProjectMemberV2 {
+export interface TeamProjectMember {
   id: string;
   startedAt: string;
   endedAt: string | null;
   isActive: boolean;
-  employee: EmployeeSummaryV2;
-  role: RoleV2;
+  employee: EmployeeSummary;
+  role: Role;
 }
 
-export interface TeamOrganizationV2 {
-  team: TeamV2;
-  assignments: TeamProjectV2[];
+export interface TeamOrganization {
+  team: Team;
+  assignments: TeamProject[];
 }
 
-export interface SaveClientV2Data {
+export interface SaveClientData {
   code: string;
   name: string;
   status?: RecordStatus;
 }
 
-export interface SaveProjectV2Data {
+export interface SaveProjectData {
   clientId: string;
   code: string;
   name: string;
@@ -90,7 +95,7 @@ export interface SaveProjectV2Data {
   actualEndDate?: string | null;
 }
 
-export interface SaveTeamProjectMembershipV2Data {
+export interface SaveTeamProjectMembershipData {
   teamProjectId: string;
   employeeId: string;
   roleId: string;

@@ -5,8 +5,8 @@ import { SupabaseModule } from '../supabase/supabase.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-    imports: [SupabaseModule, AuthModule],
-    controllers: [OtoController],
-    providers: [OtoService],
+  imports: [SupabaseModule, AuthModule],
+  controllers: [OtoController],
+  providers: [OtoService],
 })
-export class OtoModule { }
+export class OtoModule {}

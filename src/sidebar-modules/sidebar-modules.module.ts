@@ -7,6 +7,6 @@ import { AuthModule } from '../auth/auth.module';
 @Module({
   imports: [SupabaseModule, AuthModule],
   providers: [SidebarModulesService],
-  controllers: [SidebarModulesController]
+  controllers: [SidebarModulesController],
 })
-export class SidebarModulesModule { }
+export class SidebarModulesModule {}

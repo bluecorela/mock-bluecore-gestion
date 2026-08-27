@@ -14,29 +14,38 @@ describe('environment configuration', () => {
 
   it('loads environment-specific files before the generic fallback', () => {
     process.env.NODE_ENV = 'test';
-    expect(environmentFilePaths()).toEqual(['.env.test.local', '.env.test', '.env']);
+    expect(environmentFilePaths()).toEqual([
+      '.env.test.local',
+      '.env.test',
+      '.env',
+    ]);
   });
 
   it('accepts a complete production configuration', () => {
-    expect(validateEnvironment({
-      ...base,
-      NODE_ENV: 'production',
-      CORS_ORIGINS: 'https://portal.example.com',
-      FRONTEND_URL: 'https://portal.example.com',
-      SWAGGER_ENABLED: 'false',
-    })).toMatchObject({ NODE_ENV: 'production', PORT: 3000 });
+    expect(
+      validateEnvironment({
+        ...base,
+        NODE_ENV: 'production',
+        CORS_ORIGINS: 'https://portal.example.com',
+        FRONTEND_URL: 'https://portal.example.com',
+        SWAGGER_ENABLED: 'false',
+      }),
+    ).toMatchObject({ NODE_ENV: 'production', PORT: 3000 });
   });
 
   it('rejects production without explicit CORS origins', () => {
-    expect(() => validateEnvironment({
-      ...base,
-      NODE_ENV: 'production',
-      FRONTEND_URL: 'https://portal.example.com',
-    })).toThrow('CORS_ORIGINS is required in production');
+    expect(() =>
+      validateEnvironment({
+        ...base,
+        NODE_ENV: 'production',
+        FRONTEND_URL: 'https://portal.example.com',
+      }),
+    ).toThrow('CORS_ORIGINS is required in production');
   });
 
   it('rejects invalid ports', () => {
-    expect(() => validateEnvironment({ ...base, PORT: '70000' }))
-      .toThrow('PORT must be an integer between 1 and 65535');
+    expect(() => validateEnvironment({ ...base, PORT: '70000' })).toThrow(
+      'PORT must be an integer between 1 and 65535',
+    );
   });
 });

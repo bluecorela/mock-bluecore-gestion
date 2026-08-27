@@ -1,15 +1,24 @@
 export type ApplicationEnvironment = 'development' | 'test' | 'production';
 
-const environments: ApplicationEnvironment[] = ['development', 'test', 'production'];
+const environments: ApplicationEnvironment[] = [
+  'development',
+  'test',
+  'production',
+];
 
 export function environmentFilePaths(): string[] {
-  const environment = (process.env.NODE_ENV || 'development') as ApplicationEnvironment;
+  const environment = (process.env.NODE_ENV ||
+    'development') as ApplicationEnvironment;
   return [`.env.${environment}.local`, `.env.${environment}`, '.env'];
 }
 
-export function validateEnvironment(input: Record<string, unknown>): Record<string, unknown> {
+export function validateEnvironment(
+  input: Record<string, unknown>,
+): Record<string, unknown> {
   const config = { ...input };
-  const environment = String(config.NODE_ENV || 'development') as ApplicationEnvironment;
+  const environment = String(
+    config.NODE_ENV || 'development',
+  ) as ApplicationEnvironment;
   if (!environments.includes(environment)) {
     throw new Error(`NODE_ENV must be one of: ${environments.join(', ')}`);
   }
@@ -22,7 +31,8 @@ export function validateEnvironment(input: Record<string, unknown>): Record<stri
   config.PORT = port;
 
   for (const name of ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY']) {
-    if (!String(config[name] ?? '').trim()) throw new Error(`${name} is required`);
+    if (!String(config[name] ?? '').trim())
+      throw new Error(`${name} is required`);
   }
 
   try {
@@ -31,8 +41,12 @@ export function validateEnvironment(input: Record<string, unknown>): Record<stri
     throw new Error('SUPABASE_URL must be a valid URL');
   }
 
-  config.SUPABASE_V2_SCHEMA = String(config.SUPABASE_V2_SCHEMA || 'bluecore_v2');
-  config.SWAGGER_ENABLED = String(config.SWAGGER_ENABLED ?? environment !== 'production');
+  config.SUPABASE_V2_SCHEMA = String(
+    config.SUPABASE_V2_SCHEMA || 'bluecore_v2',
+  );
+  config.SWAGGER_ENABLED = String(
+    config.SWAGGER_ENABLED ?? environment !== 'production',
+  );
 
   if (environment === 'production') {
     if (!String(config.CORS_ORIGINS ?? '').trim()) {
@@ -43,8 +57,13 @@ export function validateEnvironment(input: Record<string, unknown>): Record<stri
     }
   }
 
-  if (config.AUTH_EMAIL_PROVIDER === 'supabase' && !String(config.SUPABASE_ANON_KEY ?? '').trim()) {
-    throw new Error('SUPABASE_ANON_KEY is required when AUTH_EMAIL_PROVIDER=supabase');
+  if (
+    config.AUTH_EMAIL_PROVIDER === 'supabase' &&
+    !String(config.SUPABASE_ANON_KEY ?? '').trim()
+  ) {
+    throw new Error(
+      'SUPABASE_ANON_KEY is required when AUTH_EMAIL_PROVIDER=supabase',
+    );
   }
 
   return config;

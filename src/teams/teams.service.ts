@@ -10,28 +10,76 @@ import {
   TeamDashboardData,
   TeamSprintResponse,
   SaveEvaluationRequest,
-  RotationHistory,
   CurrentEngineer,
   MemberSummary,
-  Sprint,
   SprintStatus,
 } from '../supabase/interfaces/supabase-interface';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private readonly operacionesService: OperationsService,
     private readonly supabaseDataService: SupabaseDataService,
-  ) { }
+  ) {}
+
+  async getOverview() {
+    const teams = await this.findAll();
+    return Promise.all(
+      teams.map(async (team) => {
+        const members = await this.supabaseDataService.getEmployeeByTeam(team.id);
+        return {
+          team,
+          members: members.map((member) => ({
+            id: member.id,
+            name: member.name ?? '',
+            role: member.role ?? '',
+          })),
+        };
+      }),
+    );
+  }
+
+  async getHomeContext(user: AuthenticatedUser) {
+    const allTeams = await this.findAll();
+    const teams =
+      user.role?.toLowerCase() === 'admin'
+        ? allTeams
+        : allTeams.filter((team) => team.id === user.teamId);
+    const selectedTeamId = teams[0]?.id ?? null;
+    const dashboard = selectedTeamId
+      ? await this.getDashboardData(selectedTeamId)
+      : null;
+
+    return {
+      user: {
+        id: user.personnelId,
+        name: user.name,
+        role: user.role,
+        teamId: user.teamId,
+      },
+      teams: teams.map((team) => ({ id: team.id, name: team.name })),
+      selectedTeamId,
+      dashboard,
+    };
+  }
 
   async getDashboardData(teamId: string): Promise<TeamDashboardData | null> {
     const team = await this.supabaseDataService.getTeam(teamId);
     if (!team) return null;
 
     const personnel = await this.supabaseDataService.getEmployeeByTeam(teamId);
-    const allowedRoles = ['Ingeniero de Software', 'Ingeniero de QA', 'Ingeniero QA'];
+    const allowedRoles = [
+      'Ingeniero de Software',
+      'Ingeniero de QA',
+      'Ingeniero QA',
+    ];
     const currentEngineers: CurrentEngineer[] = personnel
-      .filter((p) => allowedRoles.some((role) => p.role?.toLowerCase().includes(role.toLowerCase())))
+      .filter((p) =>
+        allowedRoles.some((role) =>
+          p.role?.toLowerCase().includes(role.toLowerCase()),
+        ),
+      )
       .map((p) => ({
         id: p.id,
         name: p.name ?? '',
@@ -39,29 +87,36 @@ export class TeamsService {
         onVacation: p.onVacation ?? null,
       }));
 
-    const historyData = await this.supabaseDataService.getRotationHistory() as RotationHistory[];
+    const historyData = await this.supabaseDataService.getRotationHistory();
     const rawSprints = await this.supabaseDataService.getSprintsByTeam(teamId);
 
     // Mapear sprints al formato que espera OperacionesService y el Dashboard
-    const sprints: DashboardSprint[] = await Promise.all(rawSprints.map(async (s) => {
-      const members = await this.supabaseDataService.getMembersBySprint(teamId, s.code);
-      return {
-        id: s.code,
-        startDate: s.start_date ?? null,
-        endDate: s.end_date ?? null,
-        sprintClosed: s.sprint_closed ?? null,
-        members: members.map((member): DashboardMember => ({
-          id: member.id,
-          name: member.name ?? '',
-          total1: member.total1,
-          total2: member.total2,
-          total3: member.total3,
-          total_final: member.total_final,
-          rating: member.rating,
-          comments: member.comments,
-        })),
-      };
-    }));
+    const sprints: DashboardSprint[] = await Promise.all(
+      rawSprints.map(async (s) => {
+        const members = await this.supabaseDataService.getMembersBySprint(
+          teamId,
+          s.code,
+        );
+        return {
+          id: s.code,
+          startDate: s.start_date ?? null,
+          endDate: s.end_date ?? null,
+          sprintClosed: s.sprint_closed ?? null,
+          members: members.map(
+            (member): DashboardMember => ({
+              id: member.id,
+              name: member.name ?? '',
+              total1: member.total1,
+              total2: member.total2,
+              total3: member.total3,
+              total_final: member.total_final,
+              rating: member.rating,
+              comments: member.comments,
+            }),
+          ),
+        };
+      }),
+    );
 
     // Ordenar sprints por fecha de inicio descendente
     const sortedSprints = [...sprints].sort((a, b) => {
@@ -88,45 +143,54 @@ export class TeamsService {
         });
 
         const validEngineers = currentEngineers.filter((p) => !p.onVacation);
-        status = (evaluatedMembers.length >= validEngineers.length && validEngineers.length > 0) ? 'Completado' : 'En proceso';
+        status =
+          evaluatedMembers.length >= validEngineers.length &&
+          validEngineers.length > 0
+            ? 'Completado'
+            : 'En proceso';
       }
 
       return {
         ...s,
-        status
+        status,
       };
     });
 
     // Calcular métricas usando OperacionesService
     // Nota: OperacionesService espera camelCase en los objetos de sprint
-    const lastPerformance = this.operacionesService.calculateLastClosedSprintPerformance(
-      sprints,
-      historyData,
-      currentEngineers
-    );
+    const lastPerformance =
+      this.operacionesService.calculateLastClosedSprintPerformance(
+        sprints,
+        historyData,
+        currentEngineers,
+      );
 
     const trend = this.operacionesService.calculateSprintPerformance(
       sprints,
       historyData,
-      currentEngineers
+      currentEngineers,
     );
 
     // Gráfico de barras del último sprint completado
     let barChartData: BarChartData = {
       labels: [],
-      datasets: [{ data: [] }]
+      datasets: [{ data: [] }],
     };
     let chartSprintId: string | null = null;
 
     for (const s of sortedSprints) {
-      const evaluatedMembers = s.members.filter((i) => i.rating !== 'Arquitecto');
+      const evaluatedMembers = s.members.filter(
+        (i) => i.rating !== 'Arquitecto',
+      );
       // Si el sprint está cerrado o tiene evaluaciones, lo usamos para la gráfica de barras
       if (evaluatedMembers.length > 0) {
         barChartData = {
           labels: evaluatedMembers.map((i) => i.name),
-          datasets: [{
-            data: evaluatedMembers.map((i) => i.total_final ?? 0)
-          }]
+          datasets: [
+            {
+              data: evaluatedMembers.map((i) => i.total_final ?? 0),
+            },
+          ],
         };
         chartSprintId = s.id;
         break;
@@ -140,7 +204,8 @@ export class TeamsService {
       },
       stats: {
         totalMembers: currentEngineers.length,
-        totalSprints: dashboardSprints.filter(s => s.status === 'Completado').length,
+        totalSprints: dashboardSprints.filter((s) => s.status === 'Completado')
+          .length,
         averagePerformance: lastPerformance?.average ?? 0,
         ratedPerformance: lastPerformance?.rating ?? 'Sin datos',
       },
@@ -148,8 +213,8 @@ export class TeamsService {
       charts: {
         barChart: barChartData,
         lineChart: trend,
-        chartSprintId: chartSprintId
-      }
+        chartSprintId: chartSprintId,
+      },
     };
   }
 
@@ -167,7 +232,10 @@ export class TeamsService {
       sprintClosed: s.sprint_closed ?? null,
     }));
   }
-  async getMembersBySprint(teamId: string, sprintId: string): Promise<MemberSummary[]> {
+  async getMembersBySprint(
+    teamId: string,
+    sprintId: string,
+  ): Promise<MemberSummary[]> {
     return this.supabaseDataService.getLegacyMembersBySprint(teamId, sprintId);
   }
 
@@ -201,19 +269,25 @@ export class TeamsService {
   }
 
   async getSprintBoardContext(teamId: string) {
-    const [team, members, sprints, rotationHistory, evaluationStatus] = await Promise.all([
-      this.getTeam(teamId),
-      this.supabaseDataService.getEmployeeByTeam(teamId),
-      this.getSprintsByTeam(teamId),
-      this.supabaseDataService.getRotationHistory() as Promise<RotationHistory[]>,
-      this.getSprintEvaluationStatus(teamId),
-    ]);
+    const [team, members, sprints, rotationHistory, evaluationStatus] =
+      await Promise.all([
+        this.getTeam(teamId),
+        this.supabaseDataService.getEmployeeByTeam(teamId),
+        this.getSprintsByTeam(teamId),
+        this.supabaseDataService.getRotationHistory(),
+        this.getSprintEvaluationStatus(teamId),
+      ]);
     if (!team) return null;
 
     const teamKeys = new Set([teamId, team.id, team.name].filter(Boolean));
-    const relevantRotationHistory = rotationHistory.filter((event: any) =>
-      teamKeys.has(event.fromTeam) || teamKeys.has(event.toTeam)
-      || teamKeys.has(event.sourceName) || teamKeys.has(event.destinationName),
+    const belongsToTeam = (value?: string | null) =>
+      value !== undefined && value !== null && teamKeys.has(value);
+    const relevantRotationHistory = rotationHistory.filter(
+      (event) =>
+        belongsToTeam(event.fromTeam) ||
+        belongsToTeam(event.toTeam) ||
+        belongsToTeam(event.sourceName) ||
+        belongsToTeam(event.destinationName),
     );
 
     return {
@@ -227,7 +301,9 @@ export class TeamsService {
 
   async saveEvaluation(data: Partial<SaveEvaluationRequest> | undefined) {
     if (!data || typeof data !== 'object') {
-      throw new BadRequestException('El cuerpo de la evaluación es obligatorio');
+      throw new BadRequestException(
+        'El cuerpo de la evaluación es obligatorio',
+      );
     }
 
     const requiredFields: Array<keyof SaveEvaluationRequest> = [
@@ -241,7 +317,9 @@ export class TeamsService {
       'ratingLabel',
       'evaluatorEmail',
     ];
-    const missingFields = requiredFields.filter((field) => data[field] === undefined || data[field] === null);
+    const missingFields = requiredFields.filter(
+      (field) => data[field] === undefined || data[field] === null,
+    );
 
     if (missingFields.length > 0) {
       throw new BadRequestException(
@@ -249,6 +327,8 @@ export class TeamsService {
       );
     }
 
-    return this.supabaseDataService.saveEvaluation(data as SaveEvaluationRequest);
+    return this.supabaseDataService.saveEvaluation(
+      data as SaveEvaluationRequest,
+    );
   }
 }

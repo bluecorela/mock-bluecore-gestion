@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { AuthenticatedRequest } from './auth.guard';
 
 @Injectable()
@@ -7,7 +12,9 @@ export class AdminGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
     if (request.user?.role !== 'Admin') {
-      throw new ForbiddenException('Solo administradores pueden realizar esta acción');
+      throw new ForbiddenException(
+        'Solo administradores pueden realizar esta acción',
+      );
     }
 
     return true;

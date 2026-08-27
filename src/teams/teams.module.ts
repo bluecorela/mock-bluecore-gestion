@@ -10,4 +10,4 @@ import { AuthModule } from '../auth/auth.module';
   controllers: [TeamsController],
   providers: [TeamsService],
 })
-export class TeamsModule { }
+export class TeamsModule {}

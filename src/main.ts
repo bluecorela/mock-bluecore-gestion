@@ -12,7 +12,8 @@ async function bootstrap() {
   // Prefijo global
   app.setGlobalPrefix('api');
 
-  const configuredOrigins = configService.get<string>('CORS_ORIGINS')
+  const configuredOrigins = configService
+    .get<string>('CORS_ORIGINS')
     ?.split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -61,4 +62,4 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port, '0.0.0.0');
 }
-bootstrap();
+void bootstrap();

@@ -1,7 +1,14 @@
 import { PartialType } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
-export class CreateClientV2Dto {
+export class CreateClientDto {
   @IsString()
   @IsNotEmpty()
   @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
@@ -18,4 +25,4 @@ export class CreateClientV2Dto {
   status?: 'active' | 'inactive';
 }
 
-export class UpdateClientV2Dto extends PartialType(CreateClientV2Dto) {}
+export class UpdateClientDto extends PartialType(CreateClientDto) {}

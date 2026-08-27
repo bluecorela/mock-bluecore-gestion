@@ -3,7 +3,7 @@ import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class SidebarModulesService {
-constructor(private readonly supabaseDataService: SupabaseDataService) { }
+  constructor(private readonly supabaseDataService: SupabaseDataService) {}
 
   async getModulesByRole(role: string) {
     return this.supabaseDataService.getModulesByRole(role);
@@ -20,5 +20,4 @@ constructor(private readonly supabaseDataService: SupabaseDataService) { }
   updateModule(moduleId: string, input: object) {
     return this.supabaseDataService.saveSidebarModule({ ...input, moduleId });
   }
-
 }

@@ -5,10 +5,10 @@ export class LoginDto {
   @ApiProperty({ example: 'admin@bluecorela.com' })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiProperty({ example: 'YourPassword123!', minLength: 8 })
   @IsString()
   @MinLength(8)
-  password: string;
+  password!: string;
 }

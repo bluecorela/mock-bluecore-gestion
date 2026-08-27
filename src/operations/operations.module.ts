@@ -3,6 +3,6 @@ import { OperationsService } from './operations.service';
 
 @Module({
   providers: [OperationsService],
-  exports: [OperationsService]
+  exports: [OperationsService],
 })
-export class OperationsModule { }
+export class OperationsModule {}

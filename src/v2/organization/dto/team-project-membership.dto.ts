@@ -1,6 +1,6 @@
 import { IsDateString, IsUUID } from 'class-validator';
 
-export class CreateTeamProjectMembershipV2Dto {
+export class CreateTeamProjectMembershipDto {
   @IsUUID()
   employeeId!: string;
 
@@ -11,7 +11,7 @@ export class CreateTeamProjectMembershipV2Dto {
   startedAt!: string;
 }
 
-export class EndTeamProjectMembershipV2Dto {
+export class EndTeamProjectMembershipDto {
   @IsDateString()
   endedAt!: string;
 }

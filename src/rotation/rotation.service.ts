@@ -1,10 +1,34 @@
 import { Injectable } from '@nestjs/common';
-import { RotatePersonnelDto, VacationDto, ReintegrateDto } from './dto/rotation.dto';
+import {
+  RotatePersonnelDto,
+  VacationDto,
+  ReintegrateDto,
+} from './dto/rotation.dto';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @Injectable()
 export class RotationService {
   constructor(private readonly supabaseDataService: SupabaseDataService) {}
+
+  async getContext() {
+    const [teams, personnel, vacationingPersonnel, history] = await Promise.all([
+      this.supabaseDataService.getTeams(),
+      this.supabaseDataService.getPersonnel(),
+      this.supabaseDataService.getVacationingPersonnel(),
+      this.supabaseDataService.getRotationHistory(),
+    ]);
+    const vacationPool = personnel.filter(
+      (person) =>
+        person.teamId?.toLowerCase() === 'pool-de-vacaciones' ||
+        person.team?.path?.toLowerCase().includes('pool-de-vacaciones'),
+    );
+    return {
+      teams,
+      vacationPool,
+      vacationingPersonnel,
+      history,
+    };
+  }
 
   async rotatePersonnel(data: RotatePersonnelDto, createdBy?: string) {
     const result = await this.supabaseDataService.manageEmployeeMovement({
