@@ -143,7 +143,7 @@ export class SprintsService {
     ).filter(
       (story) =>
         typeof story.status === 'string' &&
-        ['planned', 'in_progress', 'at_risk'].includes(story.status),
+        ['planned', 'in_progress', 'blocked'].includes(story.status),
     );
     if (pendingStories.length) {
       const nextSprint = await this.repository.findNextPlannedSprint(
@@ -186,7 +186,7 @@ export class SprintsService {
       userStories: stories.filter(
         (item) =>
           typeof item.status === 'string' &&
-          ['planned', 'in_progress', 'at_risk'].includes(item.status),
+          ['planned', 'in_progress', 'blocked'].includes(item.status),
       ),
       bugs: bugs.filter(
         (item) =>
@@ -213,7 +213,20 @@ export class SprintsService {
   async dashboard(teamId: string, sprintId: string) {
     const dashboard = await this.repository.findDashboard(teamId, sprintId);
     if (!dashboard) throw new NotFoundException('Sprint not found');
-    return dashboard;
+    const initiatives = await this.itemsRepository.countBySprint(
+      'sprint_initiatives',
+      sprintId,
+    );
+    const performanceScore = this.calculatePerformanceScore({
+      ...dashboard,
+      initiatives: { total: initiatives },
+    });
+    return {
+      ...dashboard,
+      initiatives: { total: initiatives },
+      performanceScore,
+      performanceRating: this.performanceRating(performanceScore),
+    };
   }
 
   async activeDashboard(teamId: string) {
@@ -225,6 +238,31 @@ export class SprintsService {
         'No hay un sprint en progreso para este equipo',
       );
     return this.dashboard(teamId, activeSprint.id);
+  }
+
+  async activeFullDashboard(teamId: string) {
+    const activeSprint = (
+      await this.repository.findByTeam(teamId, 'in_progress')
+    )[0];
+    if (!activeSprint)
+      throw new NotFoundException(
+        'No hay un sprint en progreso para este equipo',
+      );
+    return this.fullDashboard(teamId, activeSprint.id);
+  }
+
+  async fullDashboard(teamId: string, sprintId: string) {
+    const [dashboard, initiatives, stories, bugs, risks] = await Promise.all([
+      this.dashboard(teamId, sprintId),
+      this.itemsRepository.findAll('sprint_initiatives', sprintId),
+      this.itemsRepository.findAll('sprint_user_stories', sprintId),
+      this.itemsRepository.findAll('sprint_bugs', sprintId),
+      this.itemsRepository.findAll('sprint_risks', sprintId),
+    ]);
+    return {
+      ...dashboard,
+      details: { initiatives, stories, bugs, risks },
+    };
   }
 
   private async requireSprint(teamId: string, sprintId: string) {
@@ -261,5 +299,51 @@ export class SprintsService {
   private today(): string {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  }
+
+  private calculatePerformanceScore(dashboard: any): number {
+    const committed = Number(dashboard.sprint?.committedPoints ?? 0);
+    const completed = Number(
+      dashboard.stories?.pointsCompleted ??
+        dashboard.sprint?.completedPoints ??
+        0,
+    );
+    const delivery =
+      committed > 0 ? Math.min(100, (completed / committed) * 100) : 0;
+
+    const totalStories = Number(dashboard.stories?.total ?? 0);
+    const completedStories = Number(dashboard.stories?.completed ?? 0);
+    const storyCompletion =
+      totalStories > 0
+        ? Math.min(100, (completedStories / totalStories) * 100)
+        : 0;
+
+    const criticalBugs = Number(dashboard.bugs?.critical ?? 0);
+    const productionBugs = Number(dashboard.bugs?.production ?? 0);
+    const quality = this.clamp(100 - criticalBugs * 15 - productionBugs * 10);
+
+    const activeRisks = Number(dashboard.risks?.active ?? 0);
+    const riskControl = this.clamp(100 - activeRisks * 10);
+
+    return (
+      Math.round(
+        (delivery * 0.5 +
+          quality * 0.25 +
+          storyCompletion * 0.15 +
+          riskControl * 0.1) *
+          100,
+      ) / 100
+    );
+  }
+
+  private performanceRating(score: number): string {
+    if (score >= 90) return 'Excelente';
+    if (score >= 75) return 'Bueno';
+    if (score >= 60) return 'Moderado';
+    return 'Bajo';
+  }
+
+  private clamp(value: number): number {
+    return Math.max(0, Math.min(100, value));
   }
 }

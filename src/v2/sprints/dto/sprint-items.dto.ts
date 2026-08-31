@@ -31,7 +31,7 @@ export class CreateSprintUserStoryDto {
   @IsString() @MaxLength(180) name!: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional()
-  @IsIn(['planned', 'in_progress', 'at_risk', 'completed', 'cancelled'])
+  @IsIn(['planned', 'in_progress', 'blocked', 'completed', 'cancelled'])
   status?: string;
   @IsOptional() @IsNumber() @Min(0) storyPoints?: number;
   @IsOptional() @IsNumber() @Min(0) estimatedWorkDays?: number;
@@ -63,10 +63,12 @@ export class CreateSprintBugDto {
 export class UpdateSprintBugDto extends PartialType(CreateSprintBugDto) {}
 
 export class CreateSprintRiskDto {
+  @IsString() @MaxLength(60) code!: string;
   @IsString() description!: string;
   @IsIn(['low', 'medium', 'high', 'critical']) impact!: string;
   @IsOptional() @IsIn(['low', 'medium', 'high']) probability?: string;
   @IsOptional() @IsUUID() responsibleEmployeeId?: string;
+  @IsOptional() @IsString() @MaxLength(180) responsibleName?: string;
   @IsOptional()
   @IsIn(['open', 'at_risk', 'monitoring', 'resolved', 'accepted', 'cancelled'])
   status?: string;

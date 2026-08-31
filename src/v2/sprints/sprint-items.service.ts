@@ -85,13 +85,20 @@ export class SprintItemsService {
       | UpdateSprintRiskDto,
   ) {
     const sprint = await this.requireWritableSprint(teamId, sprintId);
-    if (kind === 'stories' && sprint.status === 'planned' && input.status !== undefined) {
+    if (kind === 'stories') {
       const currentItems = await this.repository.findAll(tables.stories, sprintId);
       const current = currentItems.find((item) => item.id === itemId);
+      if (current?.status === 'completed') {
+        throw new BadRequestException(
+          'No se puede actualizar una HU finalizada',
+        );
+      }
+      if (sprint.status === 'planned' && input.status !== undefined) {
       if (current && input.status !== current.status) {
         throw new BadRequestException(
           'No se puede cambiar el estado de una HU en un sprint planificado',
         );
+      }
       }
     }
     const payload = this.toDatabase(
@@ -184,6 +191,7 @@ export class SprintItemsService {
       },
       risks: {
         responsibleEmployeeId: 'responsible_employee_id',
+        responsibleName: 'responsible_name',
         mitigationPlan: 'mitigation_plan',
         dueDate: 'due_date',
       },

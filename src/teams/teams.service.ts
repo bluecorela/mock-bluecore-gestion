@@ -15,19 +15,23 @@ import {
   SprintStatus,
 } from '../supabase/interfaces/supabase-interface';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { SprintsService } from '../v2/sprints/sprints.service';
 
 @Injectable()
 export class TeamsService {
   constructor(
     private readonly operacionesService: OperationsService,
     private readonly supabaseDataService: SupabaseDataService,
+    private readonly sprintsService: SprintsService,
   ) {}
 
   async getOverview() {
     const teams = await this.findAll();
     return Promise.all(
       teams.map(async (team) => {
-        const members = await this.supabaseDataService.getEmployeeByTeam(team.id);
+        const members = await this.supabaseDataService.getEmployeeByTeam(
+          team.id,
+        );
         return {
           team,
           members: members.map((member) => ({
@@ -48,7 +52,7 @@ export class TeamsService {
         : allTeams.filter((team) => team.id === user.teamId);
     const selectedTeamId = teams[0]?.id ?? null;
     const dashboard = selectedTeamId
-      ? await this.getDashboardData(selectedTeamId)
+      ? await this.getHomeDashboard(selectedTeamId)
       : null;
 
     return {
@@ -90,7 +94,6 @@ export class TeamsService {
     const historyData = await this.supabaseDataService.getRotationHistory();
     const rawSprints = await this.supabaseDataService.getSprintsByTeam(teamId);
 
-    // Mapear sprints al formato que espera OperacionesService y el Dashboard
     const sprints: DashboardSprint[] = await Promise.all(
       rawSprints.map(async (s) => {
         const members = await this.supabaseDataService.getMembersBySprint(
@@ -118,26 +121,21 @@ export class TeamsService {
       }),
     );
 
-    // Ordenar sprints por fecha de inicio descendente
     const sortedSprints = [...sprints].sort((a, b) => {
       const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
       const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
       return dateB - dateA;
     });
 
-    // Calcular estado de cada sprint (Completado/En proceso)
-    // Lógica espejo del frontend
     const dashboardSprints = sortedSprints.map((s, index) => {
       let status: SprintStatus = 'En proceso';
       if (index > 0) {
         status = 'Completado';
       } else {
-        // Para el más reciente, verificamos si todos los ingenieros esperados fueron evaluados
         const evaluatedMembers = s.members.filter((i) => {
           if (i.rating === 'Arquitecto') return false;
           const persona = currentEngineers.find((p) => p.name === i.name);
           if (!persona) return false;
-          // Lógica simplificada de vacaciones para el dashboard resumido
           if (persona.onVacation) return false;
           return true;
         });
@@ -155,9 +153,6 @@ export class TeamsService {
         status,
       };
     });
-
-    // Calcular métricas usando OperacionesService
-    // Nota: OperacionesService espera camelCase en los objetos de sprint
     const lastPerformance =
       this.operacionesService.calculateLastClosedSprintPerformance(
         sprints,
@@ -170,8 +165,6 @@ export class TeamsService {
       historyData,
       currentEngineers,
     );
-
-    // Gráfico de barras del último sprint completado
     let barChartData: BarChartData = {
       labels: [],
       datasets: [{ data: [] }],
@@ -182,7 +175,6 @@ export class TeamsService {
       const evaluatedMembers = s.members.filter(
         (i) => i.rating !== 'Arquitecto',
       );
-      // Si el sprint está cerrado o tiene evaluaciones, lo usamos para la gráfica de barras
       if (evaluatedMembers.length > 0) {
         barChartData = {
           labels: evaluatedMembers.map((i) => i.name),
@@ -203,7 +195,7 @@ export class TeamsService {
         name: team.name,
       },
       stats: {
-        totalMembers: currentEngineers.length,
+        totalMembers: personnel.length,
         totalSprints: dashboardSprints.filter((s) => s.status === 'Completado')
           .length,
         averagePerformance: lastPerformance?.average ?? 0,
@@ -215,6 +207,58 @@ export class TeamsService {
         lineChart: trend,
         chartSprintId: chartSprintId,
       },
+    };
+  }
+  async getHomeDashboard(teamId: string) {
+    const team = await this.getTeam(teamId);
+    if (!team) return null;
+    const legacyDashboard = await this.getDashboardData(teamId);
+    let sprints: Awaited<ReturnType<SprintsService['findByTeam']>> = [];
+    try {
+      sprints = await this.sprintsService.findByTeam(teamId);
+    } catch (error) {
+      console.warn('Operational sprints unavailable for Home:', error);
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const sprintForToday = sprints.find(
+      (s) =>
+        s.startDate <= today &&
+        s.endDate >= today &&
+        ['planned', 'in_progress'].includes(s.status),
+    );
+    const currentSprint =
+      sprintForToday ??
+      sprints.find((s) => s.status === 'in_progress') ??
+      [...sprints]
+        .filter((s) => s.status === 'planned' && s.startDate > today)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ??
+      sprints[0] ??
+      null;
+    let sprintDashboard: any = null;
+    if (currentSprint) {
+      try {
+        sprintDashboard = await this.sprintsService.dashboard(
+          teamId,
+          currentSprint.id,
+        );
+      } catch (error) {
+        console.warn(
+          'Operational sprint dashboard unavailable for Home:',
+          error,
+        );
+      }
+    }
+
+    return {
+      team: { id: team.id, name: team.name },
+      stats: legacyDashboard?.stats ?? null,
+      sprints: legacyDashboard?.sprints ?? [],
+      charts: legacyDashboard?.charts ?? null,
+      currentSprint,
+      sprintDashboard,
+      recentSprints: sprints.slice(0, 5),
+      performance: legacyDashboard?.stats ?? null,
+      performanceCharts: legacyDashboard?.charts ?? null,
     };
   }
 

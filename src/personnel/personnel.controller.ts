@@ -94,8 +94,6 @@ export class PersonnelController {
       throw new BadRequestException('El parámetro "equipoId" es obligatorio');
     }
     const personnel = await this.personnelService.findByTeam(teamId);
-
-    // Retornar array vacío si no hay personal, en lugar de 404
     return personnel || [];
   }
 

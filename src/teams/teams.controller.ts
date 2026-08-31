@@ -88,6 +88,17 @@ export class TeamsController {
     return this.teamsService.getOverview();
   }
 
+  @Get(':teamId/home-dashboard')
+  @ApiOperation({
+    summary:
+      'Obtener dashboard consolidado operativo y de rendimiento del Home',
+  })
+  async getHomeDashboard(@Param('teamId') teamId: string) {
+    const data = await this.teamsService.getHomeDashboard(teamId);
+    if (!data) throw new NotFoundException('Equipo no encontrado');
+    return data;
+  }
+
   @Get(':teamId/dashboard')
   @ApiOperation({
     summary: 'Obtener datos consolidados para el dashboard del equipo',
@@ -213,7 +224,6 @@ export class TeamsController {
     return team;
   }
 
-  //Obtener metricas del equipo por sprint --> Buscador Métricas
   @Get(':teamId/sprints/:sprintId/metrics')
   @ApiOperation({ summary: 'Obtener métricas del equipo por sprint' })
   @ApiParam({ name: 'equipoId', type: String })

@@ -278,9 +278,25 @@ export class SupabaseDataService {
       .eq('team_id', team.id)
       .eq('is_active', true);
     if (error) throw error;
-    return this.getV2Personnel([
-      ...new Set((memberships ?? []).map((row) => row.employee_id)),
-    ]);
+    const { data: teamProjects, error: projectsError } = await database
+      .from('team_projects')
+      .select('id')
+      .eq('team_id', team.id);
+    if (projectsError) throw projectsError;
+    const projectIds = (teamProjects ?? []).map((row) => row.id);
+    const projectMembers = projectIds.length
+      ? await database
+          .from('team_project_memberships')
+          .select('employee_id')
+          .in('team_project_id', projectIds)
+          .is('ended_at', null)
+      : { data: [], error: null };
+    if (projectMembers.error) throw projectMembers.error;
+    const employeeIds = [
+      ...(memberships ?? []).map((row) => row.employee_id),
+      ...(projectMembers.data ?? []).map((row) => row.employee_id),
+    ];
+    return this.getV2Personnel([...new Set(employeeIds)]);
   }
 
   private async getV2Personnel(employeeIds?: string[]): Promise<Personnel[]> {

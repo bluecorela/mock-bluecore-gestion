@@ -2,9 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 try {
   require('dotenv').config({ quiet: true });
-} catch {
-  // dotenv is optional; environment variables can be provided by the shell.
-}
+} catch {}
 
 const tables = [
   'teams',
@@ -33,7 +31,9 @@ function getJwtRole(token) {
   if (!payload) return null;
 
   try {
-    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const decoded = JSON.parse(
+      Buffer.from(payload, 'base64url').toString('utf8'),
+    );
     return decoded.role || null;
   } catch {
     return null;
@@ -75,16 +75,12 @@ async function main() {
     );
   }
 
-  const supabase = createClient(
-    requireEnv('SUPABASE_URL'),
-    serviceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
+  const supabase = createClient(requireEnv('SUPABASE_URL'), serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
     },
-  );
+  });
 
   console.log('Conexion con Supabase OK. Conteos:');
 

@@ -63,6 +63,16 @@ export class SprintsController {
     return this.service.activeDashboard(teamId);
   }
 
+  @Get('active/full-dashboard')
+  @ApiOperation({ summary: 'Get the active sprint dashboard with all details' })
+  async activeFullDashboard(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.activeFullDashboard(teamId);
+  }
+
   @Get(':sprintId/dashboard')
   @ApiOperation({ summary: 'Get the operational dashboard for a sprint' })
   @ApiParam({ name: 'sprintId', format: 'uuid' })
@@ -73,6 +83,18 @@ export class SprintsController {
   ) {
     await this.organizationService.assertTeamAccess(teamId, user);
     return this.service.dashboard(teamId, sprintId);
+  }
+
+  @Get(':sprintId/full-dashboard')
+  @ApiOperation({ summary: 'Get a sprint dashboard with all details' })
+  @ApiParam({ name: 'sprintId', format: 'uuid' })
+  async fullDashboard(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Param('sprintId', new ParseUUIDPipe()) sprintId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.fullDashboard(teamId, sprintId);
   }
 
   @Get(':sprintId/closure-summary')
