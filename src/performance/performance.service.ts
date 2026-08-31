@@ -63,11 +63,6 @@ export class PerformanceService {
 
     return { questions, answers };
   }
-
-  // /**
-  //  * Importa la configuración inicial de preguntas a Supabase.
-  //  * Solo necesita ejecutarse una vez (o cuando se quiera resetear la config).
-  //  */
   async seedConfig() {
     const questions = [
       {

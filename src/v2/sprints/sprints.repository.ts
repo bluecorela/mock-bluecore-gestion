@@ -32,11 +32,13 @@ export class SprintsRepository {
   constructor(private readonly supabaseClient: SupabaseClient) {}
 
   async findByTeam(teamId: string, status?: string) {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return [];
     let query = this.supabaseClient
       .getV2Client()
       .from('sprints')
       .select('*')
-      .eq('team_id', teamId)
+      .eq('team_id', resolvedTeamId)
       .order('created_at', { ascending: false });
     if (status) query = query.eq('status', status);
     const { data, error } = await query;
@@ -45,23 +47,27 @@ export class SprintsRepository {
   }
 
   async findById(teamId: string, sprintId: string) {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return null;
     const { data, error } = await this.supabaseClient
       .getV2Client()
       .from('sprints')
       .select('*')
       .eq('id', sprintId)
-      .eq('team_id', teamId)
+      .eq('team_id', resolvedTeamId)
       .maybeSingle();
     if (error) this.fail('sprint', error);
     return data ? this.mapSprint(data) : null;
   }
 
   async findDashboard(teamId: string, sprintId: string) {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return null;
     const { data, error } = await this.supabaseClient
       .getV2Client()
       .from('sprint_dashboard')
       .select('*')
-      .eq('team_id', teamId)
+      .eq('team_id', resolvedTeamId)
       .eq('sprint_id', sprintId)
       .maybeSingle();
     if (error) this.fail('sprint dashboard', error);
@@ -217,5 +223,24 @@ export class SprintsRepository {
     throw new InternalServerErrorException(
       `Could not access ${resource}: ${error.message || 'unknown error'}`,
     );
+  }
+
+  private async resolveTeamId(teamId: string): Promise<string | null> {
+    if (
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        teamId,
+      )
+    ) {
+      return teamId;
+    }
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('teams')
+      .select('id')
+      .ilike('code', teamId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) this.fail('team', error);
+    return data?.id ?? null;
   }
 }

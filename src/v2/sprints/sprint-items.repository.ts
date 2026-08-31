@@ -124,7 +124,7 @@ export class SprintItemsRepository {
     const pendingStories = sourceStories.filter(
       (story) =>
         typeof story.status === 'string' &&
-        ['planned', 'in_progress', 'at_risk'].includes(story.status) &&
+        ['planned', 'in_progress', 'blocked'].includes(story.status) &&
         !targetCodes.has(story.code),
     );
     if (!pendingStories.length) return [];

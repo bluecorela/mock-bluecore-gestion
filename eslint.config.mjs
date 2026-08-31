@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // Utility scripts are plain Node.js files and are outside the TypeScript
+    // project used by the typed ESLint parser.
+    ignores: ['eslint.config.mjs', 'scripts/**/*.js'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

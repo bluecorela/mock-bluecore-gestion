@@ -9,7 +9,6 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   app.enableShutdownHooks();
 
-  // Prefijo global
   app.setGlobalPrefix('api');
 
   const configuredOrigins = configService
@@ -27,8 +26,6 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   });
-
-  // Validaciones globales
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -36,8 +33,6 @@ async function bootstrap() {
       transform: true,
     }),
   );
-
-  // Swagger config
   const config = new DocumentBuilder()
     .setTitle('APIs de Portal de Gestión')
     .setDescription('Documentación de los endpoints')
