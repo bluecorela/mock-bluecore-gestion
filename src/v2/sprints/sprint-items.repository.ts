@@ -3,6 +3,7 @@ import { SupabaseClient } from '../../supabase/supabase.client';
 
 export interface SprintItemRecord extends Record<string, unknown> {
   id?: string;
+  initiativeId?: string | null;
   code?: string;
   name?: string;
   description?: string | null;
@@ -15,6 +16,23 @@ export interface SprintItemRecord extends Record<string, unknown> {
 @Injectable()
 export class SprintItemsRepository {
   constructor(private readonly supabaseClient: SupabaseClient) {}
+
+  async nextCode(table: string, prefix: string): Promise<string> {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from(table)
+      .select('code')
+      .like('code', `${prefix}-%`);
+    if (error) this.fail(`${table} code`, error);
+
+    const nextNumber = (data ?? []).reduce((max, row) => {
+      const match = new RegExp(`^${prefix}-(\\d+)$`, 'i').exec(
+        String((row as { code?: unknown }).code ?? ''),
+      );
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 0) + 1;
+    return `${prefix}-${nextNumber}`;
+  }
 
   async findAll(table: string, sprintId: string) {
     const { data, error } = await this.supabaseClient
@@ -176,7 +194,33 @@ export class SprintItemsRepository {
     const values: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(row))
       values[key.replace(/_([a-z])/g, (_, char) => char.toUpperCase())] = value;
+    if (
+      values.progressPercentage !== undefined &&
+      values.startDate &&
+      values.plannedEndDate
+    ) {
+      values.status = this.calculateInitiativeStatus(
+        String(values.startDate),
+        String(values.plannedEndDate),
+        Number(values.progressPercentage ?? 0),
+      );
+    }
     return values;
+  }
+
+  private calculateInitiativeStatus(startDate: string, endDate: string, progress: number) {
+    if (progress >= 100) return 'completed';
+    const start = new Date(`${startDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const end = new Date(`${endDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const today = new Date();
+    const current = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    if (current > end) return 'at_risk';
+    const expected = (Math.min(Math.max(current - start, 0), Math.max(end - start, 1)) /
+      Math.max(end - start, 1)) * 100;
+    const difference = expected - progress;
+    if (difference > 15) return 'at_risk';
+    if (difference > 5) return 'requires_attention';
+    return 'in_progress';
   }
 
   private fail(resource: string, error: { message?: string }): never {

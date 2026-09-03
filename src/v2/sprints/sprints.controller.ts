@@ -51,6 +51,23 @@ export class SprintsController {
     return this.service.findByTeam(teamId, status);
   }
 
+  @Get('history-dashboard')
+  @ApiOperation({ summary: 'Get dashboard aggregates for recent sprints' })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Number of recent sprints (1-12)',
+    example: 3,
+  })
+  async historyDashboard(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.historyDashboard(teamId, Number(limit ?? 3));
+  }
+
   @Get('active/dashboard')
   @ApiOperation({
     summary: 'Get the operational dashboard for the active sprint',
@@ -83,6 +100,18 @@ export class SprintsController {
   ) {
     await this.organizationService.assertTeamAccess(teamId, user);
     return this.service.dashboard(teamId, sprintId);
+  }
+
+  @Get(':sprintId/progress-history')
+  @ApiOperation({ summary: 'Get daily sprint progress history' })
+  @ApiParam({ name: 'sprintId', format: 'uuid' })
+  async progressHistory(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Param('sprintId', new ParseUUIDPipe()) sprintId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.progressHistory(teamId, sprintId);
   }
 
   @Get(':sprintId/full-dashboard')

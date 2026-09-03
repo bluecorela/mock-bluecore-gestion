@@ -8,10 +8,11 @@ import { SprintsService } from './sprints.service';
 import { SprintItemsController } from './sprint-items.controller';
 import { SprintItemsRepository } from './sprint-items.repository';
 import { SprintItemsService } from './sprint-items.service';
+import { TeamInitiativesController } from './team-initiatives.controller';
 
 @Module({
   imports: [SupabaseModule, AuthModule, OrganizationModule],
-  controllers: [SprintsController, SprintItemsController],
+  controllers: [SprintsController, SprintItemsController, TeamInitiativesController],
   providers: [
     SprintsRepository,
     SprintsService,

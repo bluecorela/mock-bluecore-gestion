@@ -18,7 +18,7 @@ export class CreateSprintInitiativeDto {
   @IsOptional() @IsString() description?: string;
   @IsOptional() @IsNumber() @Min(0) progressPercentage?: number;
   @IsOptional()
-  @IsIn(['planned', 'in_progress', 'at_risk', 'completed', 'cancelled'])
+  @IsIn(['planned', 'in_progress', 'requires_attention', 'at_risk', 'completed', 'cancelled'])
   status?: string;
   @IsOptional() @IsUUID() ownerId?: string;
 }
@@ -27,11 +27,11 @@ export class UpdateSprintInitiativeDto extends PartialType(
 ) {}
 
 export class CreateSprintUserStoryDto {
-  @IsString() @MaxLength(60) code!: string;
+  @IsOptional() @IsString() @MaxLength(60) code?: string;
   @IsString() @MaxLength(180) name!: string;
   @IsOptional() @IsString() description?: string;
   @IsOptional()
-  @IsIn(['planned', 'in_progress', 'blocked', 'completed', 'cancelled'])
+  @IsIn(['planned', 'in_progress', 'blocked', 'completed'])
   status?: string;
   @IsOptional() @IsNumber() @Min(0) storyPoints?: number;
   @IsOptional() @IsNumber() @Min(0) estimatedWorkDays?: number;
@@ -48,7 +48,7 @@ export class MoveSprintUserStoryDto {
 
 export class CreateSprintBugDto {
   @IsIn(['bug', 'return']) type!: string;
-  @IsString() @MaxLength(60) code!: string;
+  @IsOptional() @IsString() @MaxLength(60) code?: string;
   @IsString() description!: string;
   @IsOptional() @IsUUID() storyId?: string;
   @IsIn(['low', 'medium', 'high', 'critical']) priority!: string;
@@ -63,7 +63,7 @@ export class CreateSprintBugDto {
 export class UpdateSprintBugDto extends PartialType(CreateSprintBugDto) {}
 
 export class CreateSprintRiskDto {
-  @IsString() @MaxLength(60) code!: string;
+  @IsOptional() @IsString() @MaxLength(60) code?: string;
   @IsString() description!: string;
   @IsIn(['low', 'medium', 'high', 'critical']) impact!: string;
   @IsOptional() @IsIn(['low', 'medium', 'high']) probability?: string;

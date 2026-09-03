@@ -56,6 +56,40 @@ export class SprintItemsService {
       kind,
       input as unknown as Record<string, unknown>,
     );
+    if (kind === 'initiatives') {
+      const initiativeInput = input as CreateSprintInitiativeDto;
+      let master = await this.sprintRepository.findTeamInitiative(
+        teamId,
+        sprint.projectId,
+        initiativeInput.name,
+      );
+      if (!master) {
+        master = await this.sprintRepository.createTeamInitiative({
+          team_id: teamId,
+          project_id: sprint.projectId,
+          name: initiativeInput.name,
+          description: initiativeInput.description ?? null,
+          start_date: initiativeInput.startDate,
+          planned_end_date: initiativeInput.plannedEndDate ?? null,
+          actual_end_date: initiativeInput.actualEndDate ?? null,
+          progress_percentage: initiativeInput.progressPercentage ?? 0,
+          status: initiativeInput.status ?? 'planned',
+          owner_id: initiativeInput.ownerId ?? null,
+        });
+      }
+      payload.initiative_id = master.id;
+    }
+    if (kind === 'stories')
+      payload.code = await this.repository.nextCode(tables.stories, 'HU');
+    if (kind === 'bugs') {
+      const type = String(payload.type ?? 'bug');
+      payload.code = await this.repository.nextCode(
+        tables.bugs,
+        type === 'return' ? 'RET' : 'BUG',
+      );
+    }
+    if (kind === 'risks')
+      payload.code = await this.repository.nextCode(tables.risks, 'RISK');
     if (
       (payload.status === 'resolved' || payload.status === 'closed') &&
       !payload.resolved_at
@@ -85,6 +119,11 @@ export class SprintItemsService {
       | UpdateSprintRiskDto,
   ) {
     const sprint = await this.requireWritableSprint(teamId, sprintId);
+    const currentItems =
+      kind === 'initiatives'
+        ? await this.repository.findAll(tables.initiatives, sprintId)
+        : [];
+    const currentInitiative = currentItems.find((item) => item.id === itemId);
     if (kind === 'stories') {
       const currentItems = await this.repository.findAll(tables.stories, sprintId);
       const current = currentItems.find((item) => item.id === itemId);
@@ -105,6 +144,14 @@ export class SprintItemsService {
       kind,
       input as unknown as Record<string, unknown>,
     );
+    if (kind === 'initiatives' && currentInitiative?.initiativeId) {
+      const masterFields = { ...payload };
+      delete masterFields.initiative_id;
+      await this.sprintRepository.updateTeamInitiative(
+        String(currentInitiative.initiativeId),
+        masterFields,
+      );
+    }
     if (
       (payload.status === 'resolved' || payload.status === 'closed') &&
       !payload.resolved_at
