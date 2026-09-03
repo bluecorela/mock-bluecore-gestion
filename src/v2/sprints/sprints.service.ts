@@ -24,6 +24,42 @@ export class SprintsService {
     return this.repository.findByTeam(teamId, status);
   }
 
+  findActiveInitiatives(teamId: string) {
+    return this.repository.findActiveInitiatives(teamId);
+  }
+
+  /** Dashboard aggregates for the most recent sprints, used by historical charts. */
+  async historyDashboard(teamId: string, limit = 3) {
+    const safeLimit = Math.min(Math.max(Number(limit) || 3, 1), 12);
+    const allSprints = await this.repository.findByTeam(teamId);
+    const currentSprint = allSprints.find((sprint) => sprint.status === 'in_progress');
+    const anchorNumber = currentSprint?.sprintNumber ?? Math.max(
+      ...allSprints.map((sprint) => sprint.sprintNumber),
+      0,
+    );
+    const sprints = allSprints
+      .filter((sprint) => sprint.sprintNumber <= anchorNumber)
+      .sort((a, b) => b.sprintNumber - a.sprintNumber)
+      .slice(0, safeLimit)
+      .reverse();
+
+    return Promise.all(
+      sprints.map(async (sprint) => {
+        const dashboard = await this.dashboard(teamId, sprint.id);
+        return {
+          sprint: dashboard.sprint,
+          initiatives: dashboard.initiatives,
+          stories: dashboard.stories,
+          bugs: dashboard.bugs,
+          risks: dashboard.risks,
+          completionPercentage: dashboard.completionPercentage,
+          performanceScore: dashboard.performanceScore,
+          performanceRating: dashboard.performanceRating,
+        };
+      }),
+    );
+  }
+
   async create(teamId: string, input: CreateSprintDto) {
     await this.assertProjectAssignment(
       teamId,
@@ -37,7 +73,8 @@ export class SprintsService {
       team_id: teamId,
       project_id: input.projectId,
       sprint_number: sprintNumber,
-      name: input.name,
+      // Sprint names are generated server-side to keep them sequential.
+      name: `Sprint-${sprintNumber}`,
       objective: input.objective ?? null,
       start_date: input.startDate,
       end_date: input.endDate,
@@ -263,6 +300,55 @@ export class SprintsService {
       ...dashboard,
       details: { initiatives, stories, bugs, risks },
     };
+  }
+
+  async progressHistory(teamId: string, sprintId: string) {
+    const sprint = await this.requireSprint(teamId, sprintId);
+    const stories = await this.itemsRepository.findAll(
+      'sprint_user_stories',
+      sprintId,
+    );
+    const pointsTotal = stories.reduce(
+      (total, story) => total + Number(story.storyPoints ?? 0),
+      0,
+    );
+    const endDate =
+      this.today() < sprint.endDate ? this.today() : sprint.endDate;
+    const data: Array<{
+      date: string;
+      completedPoints: number;
+      remainingPoints: number;
+    }> = [];
+    for (
+      let date = sprint.startDate;
+      date <= endDate;
+      date = this.addDays(date, 1)
+    ) {
+      const completedPoints = stories.reduce((total, story) => {
+        const completedAt =
+          typeof story.completedAt === 'string'
+            ? story.completedAt.slice(0, 10)
+            : null;
+        return (
+          total +
+          (completedAt && completedAt <= date
+            ? Number(story.storyPoints ?? 0)
+            : 0)
+        );
+      }, 0);
+      data.push({
+        date,
+        completedPoints,
+        remainingPoints: Math.max(pointsTotal - completedPoints, 0),
+      });
+    }
+    return { sprintId, pointsTotal, data };
+  }
+
+  private addDays(date: string, days: number): string {
+    const value = new Date(`${date}T00:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
   }
 
   private async requireSprint(teamId: string, sprintId: string) {

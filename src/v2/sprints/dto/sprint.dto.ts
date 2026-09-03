@@ -13,9 +13,10 @@ export class CreateSprintDto {
   @IsUUID()
   projectId!: string;
 
+  @IsOptional()
   @IsString()
   @MaxLength(120)
-  name!: string;
+  name?: string;
 
   @IsDateString()
   startDate!: string;

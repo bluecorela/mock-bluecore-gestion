@@ -60,6 +60,70 @@ export class SprintsRepository {
     return data ? this.mapSprint(data) : null;
   }
 
+  /** Initiatives are team-level records and may remain active across sprints. */
+  async findActiveInitiatives(teamId: string) {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return [];
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('team_initiatives')
+      .select('*')
+      .eq('team_id', resolvedTeamId)
+      .not('status', 'in', '(completed,cancelled)')
+      .order('created_at', { ascending: false });
+    if (error) this.fail('team initiatives', error);
+    return (data ?? []).map((row) => this.mapTeamInitiative(row));
+  }
+
+  async findTeamInitiative(
+    teamId: string,
+    projectId: string | null | undefined,
+    name: string,
+  ) {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return null;
+    let query = this.supabaseClient
+      .getV2Client()
+      .from('team_initiatives')
+      .select('*')
+      .eq('team_id', resolvedTeamId)
+      .not('status', 'in', '(completed,cancelled)')
+      .ilike('name', name)
+      .limit(1);
+    query = projectId
+      ? query.eq('project_id', projectId)
+      : query.is('project_id', null);
+    const { data, error } = await query.maybeSingle();
+    if (error) this.fail('team initiative', error);
+    return data ? this.mapTeamInitiative(data) : null;
+  }
+
+  async createTeamInitiative(input: Record<string, unknown>) {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('team_initiatives')
+      .insert(input)
+      .select('*')
+      .single();
+    if (error) this.fail('team initiative', error);
+    return this.mapTeamInitiative(data);
+  }
+
+  async updateTeamInitiative(
+    initiativeId: string,
+    input: Record<string, unknown>,
+  ) {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('team_initiatives')
+      .update(input)
+      .eq('id', initiativeId)
+      .select('*')
+      .maybeSingle();
+    if (error) this.fail('team initiative', error);
+    return data ? this.mapTeamInitiative(data) : null;
+  }
+
   async findDashboard(teamId: string, sprintId: string) {
     const resolvedTeamId = await this.resolveTeamId(teamId);
     if (!resolvedTeamId) return null;
@@ -180,6 +244,38 @@ export class SprintsRepository {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  private mapTeamInitiative(row: any) {
+    const mapped = Object.fromEntries(
+      Object.entries(row as Record<string, unknown>).map(([key, value]) => [
+        key.replace(/_([a-z])/g, (_, char) => char.toUpperCase()),
+        value,
+      ]),
+    );
+    if (mapped.startDate && mapped.plannedEndDate && mapped.progressPercentage !== undefined)
+      mapped.status = this.calculateInitiativeStatus(
+        String(mapped.startDate),
+        String(mapped.plannedEndDate),
+        Number(mapped.progressPercentage ?? 0),
+      );
+    return mapped;
+  }
+
+  private calculateInitiativeStatus(startDate: string, endDate: string, progress: number) {
+    if (progress >= 100) return 'completed';
+    const start = new Date(`${startDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const end = new Date(`${endDate.slice(0, 10)}T00:00:00Z`).getTime();
+    const today = new Date();
+    const current = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    if (current > end) return 'at_risk';
+    const duration = Math.max(end - start, 1);
+    const elapsed = Math.min(Math.max(current - start, 0), duration);
+    const expected = (elapsed / duration) * 100;
+    const difference = expected - progress;
+    if (difference > 15) return 'at_risk';
+    if (difference > 5) return 'requires_attention';
+    return 'in_progress';
   }
 
   private mapDashboard(row: any) {
