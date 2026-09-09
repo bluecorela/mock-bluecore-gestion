@@ -43,7 +43,8 @@ type UpdateSprintItemDto =
 
 @ApiTags('Sprint operational data')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('Admin', 'Scrum Master', 'Arquitecto')
 @Controller('v2/teams/:teamId/sprints/:sprintId')
 export class SprintItemsController {
   constructor(

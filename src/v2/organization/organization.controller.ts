@@ -99,8 +99,8 @@ export class OrganizationController {
 
   @Get('teams')
   @ApiOperation({ summary: 'List active teams from the normalized schema' })
-  findTeams() {
-    return this.service.findTeams();
+  findTeams(@CurrentUser() user: AuthenticatedUser) {
+    return this.service.findTeamsForUser(user);
   }
 
   @Get('employees')

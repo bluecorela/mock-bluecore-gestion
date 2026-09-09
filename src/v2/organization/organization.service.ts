@@ -62,8 +62,10 @@ export class OrganizationService {
     return this.repository.updateProject(projectId, input);
   }
 
-  findTeams() {
-    return this.repository.findTeams();
+  findTeamsForUser(user: AuthenticatedUser) {
+    if (user.role?.toLowerCase() === 'admin') return this.repository.findTeams();
+    if (!user.personnelId) return Promise.resolve([]);
+    return this.repository.findTeamsForEmployee(user.personnelId);
   }
 
   async findEmployees(teamId?: string) {
@@ -90,10 +92,13 @@ export class OrganizationService {
     const organization = await this.repository.findTeamOrganization(teamId);
     if (!organization) throw new NotFoundException('Team not found');
 
-    if (user.role !== 'Admin' && user.teamId !== teamId) {
+    if (user.role !== 'Admin' && user.personnelId && !(await this.repository.isEmployeeInTeam(user.personnelId, teamId))) {
       throw new ForbiddenException(
         'No tiene permisos para acceder a este equipo',
       );
+    }
+    if (user.role !== 'Admin' && !user.personnelId) {
+      throw new ForbiddenException('No tiene permisos para acceder a este equipo');
     }
   }
 

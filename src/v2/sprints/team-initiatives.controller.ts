@@ -3,12 +3,15 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '../../auth/auth.guard';
 import { CurrentUser } from '../../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../../auth/interfaces/auth-user.interface';
+import { Roles } from '../../auth/roles.decorator';
+import { RolesGuard } from '../../auth/roles.guard';
 import { OrganizationService } from '../organization/organization.service';
 import { SprintsService } from './sprints.service';
 
 @ApiTags('Team initiatives')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('Admin', 'Scrum Master', 'Arquitecto')
 @Controller('v2/teams/:teamId/initiatives')
 export class TeamInitiativesController {
   constructor(

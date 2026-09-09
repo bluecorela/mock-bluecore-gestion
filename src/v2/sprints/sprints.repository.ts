@@ -253,7 +253,11 @@ export class SprintsRepository {
         value,
       ]),
     );
-    if (mapped.startDate && mapped.plannedEndDate && mapped.progressPercentage !== undefined)
+    if (
+      mapped.startDate &&
+      mapped.plannedEndDate &&
+      mapped.progressPercentage !== undefined
+    )
       mapped.status = this.calculateInitiativeStatus(
         String(mapped.startDate),
         String(mapped.plannedEndDate),
@@ -262,12 +266,20 @@ export class SprintsRepository {
     return mapped;
   }
 
-  private calculateInitiativeStatus(startDate: string, endDate: string, progress: number) {
+  private calculateInitiativeStatus(
+    startDate: string,
+    endDate: string,
+    progress: number,
+  ) {
     if (progress >= 100) return 'completed';
     const start = new Date(`${startDate.slice(0, 10)}T00:00:00Z`).getTime();
     const end = new Date(`${endDate.slice(0, 10)}T00:00:00Z`).getTime();
     const today = new Date();
-    const current = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+    const current = Date.UTC(
+      today.getUTCFullYear(),
+      today.getUTCMonth(),
+      today.getUTCDate(),
+    );
     if (current > end) return 'at_risk';
     const duration = Math.max(end - start, 1);
     const elapsed = Math.min(Math.max(current - start, 0), duration);
@@ -290,6 +302,10 @@ export class SprintsRepository {
         status: row.status,
         startDate: row.start_date,
         endDate: row.end_date,
+        plannedHistoryCount: row.planned_history_count,
+        inProgressHistoryCount: row.in_progress_history_count,
+        blockedHistoryCount: row.blocked_history_count,
+        completedHistoryCount: row.completed_history_count,
         committedPoints: row.committed_points,
         completedPoints: row.completed_points,
         wipStories: row.wip_stories,
@@ -298,7 +314,10 @@ export class SprintsRepository {
       },
       stories: {
         total: row.stories_total,
+        planned: row.stories_planned,
+        inProgress: row.stories_in_progress,
         completed: row.stories_completed,
+        blocked: row.stories_blocked,
         pointsTotal: row.story_points_total,
         pointsCompleted: row.story_points_completed,
       },

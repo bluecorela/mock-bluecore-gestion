@@ -203,6 +203,74 @@ export class OrganizationRepository {
     return (data ?? []).map((row) => this.mapTeam(row));
   }
 
+  async findTeamsForEmployee(employeeId: string): Promise<Team[]> {
+    const database = this.supabaseClient.getV2Client();
+    const resolvedEmployeeId = await this.resolveEmployeeId(employeeId);
+    if (!resolvedEmployeeId) return [];
+    const [{ data: memberships, error: membershipError }, { data: projectMemberships, error: projectMembershipError }] = await Promise.all([
+      database.from('team_memberships').select('team_id').eq('employee_id', resolvedEmployeeId).eq('is_active', true),
+      database.from('team_project_memberships').select('team_project_id').eq('employee_id', resolvedEmployeeId).eq('is_active', true),
+    ]);
+    if (membershipError) this.throwDatabaseError('team memberships', membershipError);
+    if (projectMembershipError) this.throwDatabaseError('team project memberships', projectMembershipError);
+    const projectIds = [...new Set((projectMemberships ?? []).map((row) => row.team_project_id))];
+    let projectTeamIds: string[] = [];
+    if (projectIds.length) {
+      const { data: assignments, error: assignmentError } = await database
+        .from('team_projects').select('team_id').in('id', projectIds);
+      if (assignmentError) this.throwDatabaseError('team project assignments', assignmentError);
+      projectTeamIds = (assignments ?? []).map((row) => row.team_id);
+    }
+    const teamIds = [...new Set([
+      ...(memberships ?? []).map((row) => row.team_id),
+      ...projectTeamIds,
+    ])];
+    if (!teamIds.length) return [];
+    const { data, error } = await database
+      .from('teams')
+      .select('*')
+      .in('id', teamIds)
+      .is('deleted_at', null)
+      .order('name');
+    if (error) this.throwDatabaseError('teams', error);
+    return (data ?? []).map((row) => this.mapTeam(row));
+  }
+
+  async isEmployeeInTeam(employeeId: string, teamId: string): Promise<boolean> {
+    const database = this.supabaseClient.getV2Client();
+    const resolvedEmployeeId = await this.resolveEmployeeId(employeeId);
+    if (!resolvedEmployeeId) return false;
+    const [{ data: teamMemberships, error: teamError }, { data: projectMemberships, error: projectError }] = await Promise.all([
+      database.from('team_memberships').select('employee_id').eq('employee_id', resolvedEmployeeId).eq('team_id', teamId).eq('is_active', true).limit(1),
+      database.from('team_project_memberships').select('team_project_id').eq('employee_id', resolvedEmployeeId).eq('is_active', true),
+    ]);
+    if (teamError) this.throwDatabaseError('team memberships', teamError);
+    if (projectError) this.throwDatabaseError('team project memberships', projectError);
+    if (teamMemberships?.length) return true;
+
+    const projectIds = (projectMemberships ?? []).map((row) => row.team_project_id);
+    if (!projectIds.length) return false;
+    const { data: assignments, error: assignmentError } = await database
+      .from('team_projects')
+      .select('id')
+      .in('id', projectIds)
+      .eq('team_id', teamId)
+      .limit(1);
+    if (assignmentError) this.throwDatabaseError('team project assignments', assignmentError);
+    return Boolean(assignments?.length);
+  }
+
+  private async resolveEmployeeId(identifier: string): Promise<string | null> {
+    const database = this.supabaseClient.getV2Client();
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
+    const query = database.from('employees').select('id').is('deleted_at', null).limit(1);
+    const { data, error } = isUuid
+      ? await query.eq('id', identifier).maybeSingle()
+      : await query.eq('employee_code', identifier).maybeSingle();
+    if (error) this.throwDatabaseError('employee', error);
+    return data?.id ?? null;
+  }
+
   async findEmployees(teamId?: string): Promise<EmployeeSummary[]> {
     const database = this.supabaseClient.getV2Client();
     let employeeIds: string[] | undefined;

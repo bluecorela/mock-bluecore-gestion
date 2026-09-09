@@ -28,15 +28,63 @@ export class SprintsService {
     return this.repository.findActiveInitiatives(teamId);
   }
 
+  /**
+   * Bootstrap payload for the sprint screen. Keeping this aggregation in the
+   * API avoids making the frontend request organization, employees, sprints,
+   * history and the selected sprint dashboard independently.
+   */
+  async initialContext(teamId: string, today?: string) {
+    const [organization, employees, sprints, historicalDashboards] =
+      await Promise.all([
+        this.organizationService.findTeamOrganization(teamId),
+        this.organizationService.findEmployees(teamId),
+        this.findByTeam(teamId),
+        this.historyDashboard(teamId, 3),
+      ]);
+
+    const referenceDate = today ?? this.today();
+    const sprintForToday = sprints.find(
+      (sprint) =>
+        sprint.startDate <= referenceDate && sprint.endDate >= referenceDate,
+    );
+    const activeSprint = sprints.find(
+      (sprint) => sprint.status === 'in_progress',
+    );
+    const selectedSprint =
+      sprintForToday ??
+      activeSprint ??
+      sprints.find((sprint) => sprint.status === 'planned') ??
+      sprints[0] ??
+      null;
+
+    const [dashboard, activeInitiatives] = selectedSprint
+      ? await Promise.all([
+          this.fullDashboard(teamId, selectedSprint.id),
+          this.findActiveInitiatives(teamId),
+        ])
+      : [null, []];
+
+    return {
+      organization,
+      employees,
+      sprints,
+      selectedSprint,
+      dashboard,
+      activeInitiatives,
+      historicalDashboards,
+    };
+  }
+
   /** Dashboard aggregates for the most recent sprints, used by historical charts. */
   async historyDashboard(teamId: string, limit = 3) {
     const safeLimit = Math.min(Math.max(Number(limit) || 3, 1), 12);
     const allSprints = await this.repository.findByTeam(teamId);
-    const currentSprint = allSprints.find((sprint) => sprint.status === 'in_progress');
-    const anchorNumber = currentSprint?.sprintNumber ?? Math.max(
-      ...allSprints.map((sprint) => sprint.sprintNumber),
-      0,
+    const currentSprint = allSprints.find(
+      (sprint) => sprint.status === 'in_progress',
     );
+    const anchorNumber =
+      currentSprint?.sprintNumber ??
+      Math.max(...allSprints.map((sprint) => sprint.sprintNumber), 0);
     const sprints = allSprints
       .filter((sprint) => sprint.sprintNumber <= anchorNumber)
       .sort((a, b) => b.sprintNumber - a.sprintNumber)
@@ -250,9 +298,20 @@ export class SprintsService {
   async dashboard(teamId: string, sprintId: string) {
     const dashboard = await this.repository.findDashboard(teamId, sprintId);
     if (!dashboard) throw new NotFoundException('Sprint not found');
-    const initiatives = await this.itemsRepository.countBySprint(
-      'sprint_initiatives',
-      sprintId,
+    const [initiatives, stories] = await Promise.all([
+      this.itemsRepository.countBySprint('sprint_initiatives', sprintId),
+      this.itemsRepository.findAll('sprint_user_stories', sprintId),
+    ]);
+    const storyCounts = stories.reduce<{ planned: number; inProgress: number; blocked: number; completed: number }>(
+      (counts, story) => {
+        const status = String(story.status ?? '');
+        if (status === 'planned') counts.planned += 1;
+        else if (status === 'in_progress') counts.inProgress += 1;
+        else if (status === 'blocked') counts.blocked += 1;
+        else if (status === 'completed') counts.completed += 1;
+        return counts;
+      },
+      { planned: 0, inProgress: 0, blocked: 0, completed: 0 },
     );
     const performanceScore = this.calculatePerformanceScore({
       ...dashboard,
@@ -261,6 +320,14 @@ export class SprintsService {
     return {
       ...dashboard,
       initiatives: { total: initiatives },
+      stories: {
+        ...dashboard.stories,
+        planned: storyCounts.planned,
+        inProgress: storyCounts.inProgress,
+        blocked: storyCounts.blocked,
+        completed: storyCounts.completed,
+        total: stories.length,
+      },
       performanceScore,
       performanceRating: this.performanceRating(performanceScore),
     };

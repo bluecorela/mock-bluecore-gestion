@@ -31,7 +31,8 @@ import { SprintsService } from './sprints.service';
 
 @ApiTags('Sprints')
 @ApiBearerAuth()
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Roles('Admin', 'Scrum Master', 'Arquitecto')
 @Controller('v2/teams/:teamId/sprints')
 export class SprintsController {
   constructor(
@@ -49,6 +50,25 @@ export class SprintsController {
   ) {
     await this.organizationService.assertTeamAccess(teamId, user);
     return this.service.findByTeam(teamId, status);
+  }
+
+  @Get('initial-context')
+  @ApiOperation({
+    summary: 'Get all data required to initialize the sprint screen',
+  })
+  @ApiQuery({
+    name: 'today',
+    required: false,
+    description: 'Reference date used to select the current sprint (YYYY-MM-DD)',
+    example: '2026-09-09',
+  })
+  async initialContext(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Query('today') today: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.initialContext(teamId, today);
   }
 
   @Get('history-dashboard')
