@@ -13,9 +13,9 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
-import { OrganizationModule } from './v2/organization/organization.module';
-import { WeeklyDashboardModule } from './v2/weekly-dashboard/weekly-dashboard.module';
-import { SprintsModule } from './v2/sprints/sprints.module';
+import { OrganizationModule } from './organization/organization.module';
+import { WeeklyDashboardModule } from './weekly-dashboard/weekly-dashboard.module';
+import { SprintsModule } from './sprints/sprints.module';
 import {
   environmentFilePaths,
   validateEnvironment,
