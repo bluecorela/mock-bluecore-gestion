@@ -1,0 +1,67 @@
+version: 2.1
+
+orbs:
+  aws-cli: circleci/aws-cli@5.4.2
+  terraform: circleci/terraform@3.7.0
+  aws-ecr: bluecorelatemp/aws-ecr@0.0.2
+  replace: bluecorelatemp/replace@0.0.2
+
+jobs:
+  deploy-terraform:
+    docker:
+      - image: hashicorp/terraform:latest
+    steps:
+      - checkout
+      - run:
+          name: Install Python, AWS CLI, and jq
+          command: apk add --no-cache python3 aws-cli jq
+      - aws-cli/setup:
+          role_arn: ${OIDC_ROL_ARN}
+      - aws-ecr/get-latest-tag:
+          repo_name: "mgmt-web"
+      - replace/replace:
+          files: ".circleci/iac/prod.auto.tfvars"
+      - terraform/init:
+          path: .circleci/iac
+      - terraform/plan:
+          path: .circleci/iac
+      - terraform/apply:
+          path: .circleci/iac
+
+  build-and-push:
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies and compile Angular
+          command: |
+            npm ci
+            npm run build:prod
+      - aws-cli/setup:
+          role_arn: ${OIDC_ROL_ARN}
+      - setup_remote_docker
+      - aws-ecr/create-repo-if-not-exists:
+          repo_name: "mgmt-web"
+      - aws-ecr/build-image:
+          image_name: "mgmt-web:latest"
+          dockerfile: ".circleci/Dockerfile"
+          platform: linux/amd64
+      - aws-ecr/get-and-set-tag:
+          repo_name: "mgmt-web"
+      - aws-ecr/push-image:
+          image_name: "mgmt-web:latest"
+          repo_name: "mgmt-web"
+
+workflows:
+  deploy-infra-and-app:
+    jobs:
+      - build-and-push:
+          context: aws
+          # filters:
+          #   branches:
+          #     only: dev
+      - deploy-terraform:
+          context: aws
+          requires:
+            - build-and-push
