@@ -18,7 +18,7 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 
 ## Prerequisites
 
-- Node.js (version 18 or higher)
+- Node.js 20 or 22 LTS (`nvm use` selects the recommended version)
 - npm or yarn
 - Supabase project with Data API enabled
 - Supabase secret/service role key for backend access
@@ -26,12 +26,14 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone <repository-url>
    cd mock-bluecore-gestion
    ```
 
 2. Install dependencies:
+
    ```bash
    npm install
    ```
@@ -40,6 +42,7 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
    Create a `.env` file in the root directory and configure your Supabase credentials and other necessary variables.
 
    EXAMPLE:
+
 ```
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=your_secret_or_service_role_key
@@ -49,6 +52,50 @@ API backend construida con NestJS para el portal de gestión interna de Bluecore
 `SUPABASE_V2_SCHEMA` is optional and defaults to `bluecore_v2`. Application
 data access uses `SupabaseClient.getV2Client()`; the default Supabase client is
 reserved for Auth administration.
+
+## Database schema and migrations
+
+For a new environment, run `scripts/create-bluecore-v2-schema.sql` first.
+Then apply every file in `scripts/migrations/` in filename order. The
+`20260916_sprint_operations.sql` migration creates the operational sprint
+tables, dashboard view, atomic counters and transactional functions used by
+the API. The subsequent `20260917_sprint_idempotency.sql` migration makes
+sprint closure and story movement safe to retry.
+The `20260918_sprint_evaluation_team_membership.sql` migration restricts sprint
+evaluation records to members of the selected team.
+The `20260921_email_and_report_integrity.sql` migration enforces
+case-insensitive active employee emails and forward-only weekly report status
+transitions. Employees may keep active memberships in multiple teams; the
+database only prevents duplicate active membership in the same team.
+The `20260921_multi_team_movements.sql` migration updates rotations and
+vacation coverage so they only close the membership involved in the movement
+and preserve every unrelated active team assignment. A vacation replacement
+must come from `pool-de-vacaciones`, covers every active team of the absent
+employee and returns to the pool when the absence is completed.
+
+`PATCH /api/auth/password/change-completed` now accepts `{ "newPassword": "..." }`
+and changes the password before clearing the initial-change flag. Update callers
+that previously sent an empty body.
+
+Before applying `20260916_one_active_sprint.sql`, run its preflight query and
+resolve any team with more than one `in_progress` sprint. Database migrations
+must be tested in a non-production Supabase project before promotion.
+
+Run `npm run supabase:check` after deployment. Besides connectivity and row
+counts, it verifies the required RPC contract and checks active membership,
+sprint and employee-email invariants without modifying remote data.
+
+Set `SUPABASE_DB_URL` to the PostgreSQL connection string and use the tracked
+migration runner to inspect or apply pending files:
+
+```bash
+npm run supabase:migrations:status
+npm run supabase:migrations:apply
+```
+
+The runner serializes executions with a PostgreSQL advisory lock, records a
+SHA-256 checksum for every migration and refuses changed migrations.
+
 ## Running the Application
 
 ```bash
@@ -98,7 +145,7 @@ Production-like local validation:
 ```bash
 ENV_FILE=.env.production NODE_ENV=production docker compose up --build -d
 docker compose ps
-curl http://localhost:3000/api
+curl http://localhost:3000/api/health
 ```
 
 Build an image for a registry:
@@ -115,7 +162,7 @@ Cloud runtime requirements:
 - Set `CORS_ORIGINS` to the comma-separated production frontend origins.
 - Set `FRONTEND_URL` to the production frontend URL.
 - Keep `SWAGGER_ENABLED=false` unless API documentation must be public.
-- Route health checks to `GET /api` on the platform-provided `PORT`.
+- Route health checks to `GET /api/health` on the platform-provided `PORT`.
 - Do not mount persistent storage; Supabase is the persistence layer.
 
 Environment file precedence outside Docker is:
@@ -228,6 +275,7 @@ src/
     └── maintenance.module.ts
 
 ```
+
 ## Key Business Logic
 
 Performance Metrics (Cuadro de Sprints)
@@ -240,7 +288,6 @@ Migration Scripts
 ```bash
 npm run supabase:check
 ```
-
 
 ## Contributing
 

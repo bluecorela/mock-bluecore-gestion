@@ -24,6 +24,7 @@ import { CreateAuthUserDto } from './dto/create-auth-user.dto';
 import { UpdateAuthUserDto } from './dto/update-auth-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -31,6 +32,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Obtener token para probar la API desde Swagger (solo desarrollo y pruebas)',
