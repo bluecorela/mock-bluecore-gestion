@@ -11,14 +11,19 @@ export class RotationService {
   constructor(private readonly supabaseDataService: SupabaseDataService) {}
 
   async getContext() {
-    const [teams, personnel, vacationingPersonnel, history] = await Promise.all([
-      this.supabaseDataService.getTeams(),
-      this.supabaseDataService.getPersonnel(),
-      this.supabaseDataService.getVacationingPersonnel(),
-      this.supabaseDataService.getRotationHistory(),
-    ]);
+    const [teams, personnel, vacationingPersonnel, history] = await Promise.all(
+      [
+        this.supabaseDataService.getTeams(),
+        this.supabaseDataService.getPersonnel(),
+        this.supabaseDataService.getVacationingPersonnel(),
+        this.supabaseDataService.getRotationHistory(),
+      ],
+    );
     const vacationPool = personnel.filter(
       (person) =>
+        person.teamIds?.some(
+          (teamId) => teamId.toLowerCase() === 'pool-de-vacaciones',
+        ) ||
         person.teamId?.toLowerCase() === 'pool-de-vacaciones' ||
         person.team?.path?.toLowerCase().includes('pool-de-vacaciones'),
     );
