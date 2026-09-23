@@ -18,7 +18,7 @@ jobs:
       - aws-cli/setup:
           role_arn: ${OIDC_ROL_ARN}
       - aws-ecr/get-latest-tag:
-          repo_name: "mgmt-web"
+          repo_name: "mgmt-back"
       - replace/replace:
           files: ".circleci/iac/prod.auto.tfvars"
       - terraform/init:
@@ -34,24 +34,24 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Install dependencies and compile Angular
+          name: Install dependencies and compile NestJS
           command: |
             npm ci
-            npm run build:prod
+            npm run build
       - aws-cli/setup:
           role_arn: ${OIDC_ROL_ARN}
       - setup_remote_docker
       - aws-ecr/create-repo-if-not-exists:
-          repo_name: "mgmt-web"
+          repo_name: "mgmt-back"
       - aws-ecr/build-image:
-          image_name: "mgmt-web:latest"
+          image_name: "mgmt-back:latest"
           dockerfile: ".circleci/Dockerfile"
           platform: linux/amd64
       - aws-ecr/get-and-set-tag:
-          repo_name: "mgmt-web"
+          repo_name: "mgmt-back"
       - aws-ecr/push-image:
-          image_name: "mgmt-web:latest"
-          repo_name: "mgmt-web"
+          image_name: "mgmt-back:latest"
+          repo_name: "mgmt-back"
 
 workflows:
   deploy-infra-and-app:
