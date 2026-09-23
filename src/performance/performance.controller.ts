@@ -23,13 +23,17 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @ApiTags('Performance')
 @Controller('performance')
 @UseGuards(AuthGuard)
 @ApiBearerAuth()
 export class PerformanceController {
-  constructor(private readonly performanceService: PerformanceService) {}
+  constructor(
+    private readonly performanceService: PerformanceService,
+    private readonly dataService: SupabaseDataService,
+  ) {}
 
   @Get('config')
   @ApiOperation({
@@ -60,8 +64,12 @@ export class PerformanceController {
   @ApiOperation({
     summary: 'Obtener contexto consolidado para evaluación de desempeño',
   })
-  getContext(@Param('teamId') teamId: string) {
+  async getContext(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    await this.dataService.assertLegacyTeamAccess(teamId, user);
     return this.performanceService.getContext(teamId);
   }
 
@@ -84,6 +92,7 @@ export class PerformanceController {
     @Body() data: CreatePerformanceEvaluationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.dataService.assertLegacyTeamAccess(data.teamId, user);
     return this.performanceService.save({ ...data, evaluatorName: user.name! });
   }
 
@@ -93,8 +102,12 @@ export class PerformanceController {
   @ApiOperation({
     summary: 'Obtener historial de evaluaciones de desempeño por equipo',
   })
-  async getHistory(@Param('teamId') teamId: string) {
+  async getHistory(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    await this.dataService.assertLegacyTeamAccess(teamId, user);
     return this.performanceService.getHistory(teamId);
   }
 
@@ -119,7 +132,14 @@ export class PerformanceController {
   @ApiOperation({
     summary: 'Listar historial de habilitaciones de evaluaciones',
   })
-  async getEnablements(@Query('teamId') teamId?: string) {
+  async getEnablements(
+    @Query('teamId') teamId: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    if (user.role !== 'Admin') {
+      if (!teamId) throw new BadRequestException('teamId es obligatorio');
+      await this.dataService.assertLegacyTeamAccess(teamId, user);
+    }
     return this.performanceService.getEnablements(teamId);
   }
 
@@ -127,7 +147,11 @@ export class PerformanceController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('Admin', 'Arquitecto')
   @ApiOperation({ summary: 'Obtener la habilitación activa para un equipo' })
-  async getActiveEnablement(@Param('teamId') teamId: string) {
+  async getActiveEnablement(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.dataService.assertLegacyTeamAccess(teamId, user);
     return this.performanceService.getActiveEnablement(teamId);
   }
 }

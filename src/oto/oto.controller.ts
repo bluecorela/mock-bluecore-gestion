@@ -21,13 +21,17 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
 
 @ApiTags('One to One')
 @Controller('oto')
 @UseGuards(AuthGuard)
 @ApiBearerAuth()
 export class OtoController {
-  constructor(private readonly otoService: OtoService) {}
+  constructor(
+    private readonly otoService: OtoService,
+    private readonly dataService: SupabaseDataService,
+  ) {}
 
   @Get('config')
   @ApiOperation({
@@ -54,8 +58,12 @@ export class OtoController {
   @ApiOperation({
     summary: 'Obtener contexto consolidado para evaluación One to One',
   })
-  getContext(@Param('teamId') teamId: string) {
+  async getContext(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    await this.dataService.assertLegacyTeamAccess(teamId, user);
     return this.otoService.getContext(teamId);
   }
 
@@ -79,6 +87,7 @@ export class OtoController {
     @Body() data: CreateOtoEvaluationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.dataService.assertLegacyTeamAccess(data.teamId, user);
     return this.otoService.save({ ...data, evaluatorName: user.name! });
   }
 
@@ -88,8 +97,12 @@ export class OtoController {
   @ApiOperation({
     summary: 'Obtener historial de evaluaciones One to One por equipo',
   })
-  async getHistory(@Param('teamId') teamId: string) {
+  async getHistory(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
     if (!teamId) throw new BadRequestException('El equipoId es obligatorio');
+    await this.dataService.assertLegacyTeamAccess(teamId, user);
     return this.otoService.getHistory(teamId);
   }
 }
