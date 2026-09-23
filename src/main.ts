@@ -9,7 +9,9 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   app.enableShutdownHooks();
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: ['/', 'health', 'api', 'api/health'],
+  });
 
   const configuredOrigins = configService
     .get<string>('CORS_ORIGINS')
