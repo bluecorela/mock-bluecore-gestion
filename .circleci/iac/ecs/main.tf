@@ -60,6 +60,16 @@ resource "aws_ecs_task_definition" "web" {
           protocol      = "tcp"
         }
       ]
+      environment = [
+        { name = "NODE_ENV", value = "production" },
+        { name = "PORT", value = "3000" },
+        { name = "SUPABASE_URL", value = "https://placeholder.supabase.co" },
+        { name = "SUPABASE_SERVICE_ROLE_KEY", value = "placeholder-service-key" },
+        { name = "SUPABASE_ANON_KEY", value = "placeholder-anon-key" },
+        { name = "CORS_ORIGINS", value = "*" },
+        { name = "FRONTEND_URL", value = "https://placeholder.example.com" },
+        { name = "SWAGGER_ENABLED", value = "true" }
+      ]
       logConfiguration = {
         logDriver = "awslogs"
         options = {

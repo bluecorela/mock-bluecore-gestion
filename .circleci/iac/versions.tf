@@ -3,7 +3,7 @@ terraform {
 
   backend "s3" {
     bucket       = "bluecore-tf-states"
-    key          = "bluecore-gestion-ecs/prod.tfstate"
+    key          = "bluecore-back-ecs/prod.tfstate"
     region       = "us-east-1"
     encrypt      = true
     use_lockfile = true
