@@ -1,8 +1,10 @@
 import {
+  Body,
   Controller,
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -14,6 +16,7 @@ import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
 import { OrganizationService } from '../../organization/services/organization.service';
 import { SprintsService } from '../services/sprints.service';
+import { UpdateSprintInitiativeDto } from '../dto/sprint-items.dto';
 
 @ApiTags('Team initiatives')
 @ApiBearerAuth()
@@ -48,5 +51,17 @@ export class TeamInitiativesController {
   ) {
     await this.organizationService.assertTeamAccess(teamId, user);
     return this.service.findInitiativesForPeriod(teamId, startDate, endDate);
+  }
+
+  @Patch(':initiativeId')
+  @ApiOperation({ summary: 'Update a long-lived team initiative' })
+  async update(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Param('initiativeId', new ParseUUIDPipe()) initiativeId: string,
+    @Body() input: UpdateSprintInitiativeDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamAccess(teamId, user);
+    return this.service.updateTeamInitiative(teamId, initiativeId, input);
   }
 }

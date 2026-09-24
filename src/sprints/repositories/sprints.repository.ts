@@ -84,6 +84,22 @@ export class SprintsRepository {
       .map((row) => mapTeamInitiative(row));
   }
 
+  async updateTeamInitiative(
+    teamId: string,
+    initiativeId: string,
+    input: Record<string, unknown>,
+  ) {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .rpc('update_team_initiative', {
+        p_team_id: teamId,
+        p_initiative_id: initiativeId,
+        p_payload: input,
+      });
+    if (error) this.fail('team initiative', error);
+    return data ? mapTeamInitiative(data) : null;
+  }
+
   async findDashboard(teamId: string, sprintId: string) {
     const resolvedTeamId = await this.resolveTeamId(teamId);
     if (!resolvedTeamId) return null;

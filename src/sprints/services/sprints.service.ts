@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { OrganizationService } from '../../organization/services/organization.service';
 import { CreateSprintDto, UpdateSprintDto } from '../dto/sprint.dto';
+import { UpdateSprintInitiativeDto } from '../dto/sprint-items.dto';
 import { SprintsRepository } from '../repositories/sprints.repository';
 import { SprintItemsRepository } from '../repositories/sprint-items.repository';
 import type { Sprint, SprintStatus } from '../interfaces/sprint.interface';
@@ -41,6 +42,20 @@ export class SprintsService {
       startDate,
       endDate,
     );
+  }
+
+  async updateTeamInitiative(
+    teamId: string,
+    initiativeId: string,
+    input: UpdateSprintInitiativeDto,
+  ) {
+    const row = await this.repository.updateTeamInitiative(
+      teamId,
+      initiativeId,
+      this.toInitiativeDatabase(input),
+    );
+    if (!row) throw new NotFoundException('Initiative not found');
+    return row;
   }
 
   /**
@@ -383,6 +398,21 @@ export class SprintsService {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
     const parsed = new Date(`${value}T00:00:00Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().startsWith(value);
+  }
+
+  private toInitiativeDatabase(input: UpdateSprintInitiativeDto) {
+    const fields: Record<string, string> = {
+      startDate: 'start_date',
+      plannedEndDate: 'planned_end_date',
+      actualEndDate: 'actual_end_date',
+      progressPercentage: 'progress_percentage',
+      ownerId: 'owner_id',
+    };
+    return Object.fromEntries(
+      Object.entries(input)
+        .filter(([, value]) => value !== undefined)
+        .map(([key, value]) => [fields[key] ?? key, value]),
+    );
   }
 
   private sumStoryPoints(stories: Array<{ storyPoints?: number }>): number {

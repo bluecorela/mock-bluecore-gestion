@@ -39,6 +39,7 @@ describe('SprintsService initialContext', () => {
     hasPreviousUnclosedSprint: jest.fn(),
     completeTransactional: jest.fn(),
     createWithStories: jest.fn(),
+    updateTeamInitiative: jest.fn(),
   };
   const itemsRepository = {
     findAll: jest.fn(),
@@ -112,6 +113,26 @@ describe('SprintsService initialContext', () => {
     expect(() =>
       service.findInitiativesForPeriod('team-id', 'invalid', '2026-09-14'),
     ).toThrow('startDate and endDate must use the YYYY-MM-DD format');
+  });
+
+  it('updates a team initiative using database field names', async () => {
+    repository.updateTeamInitiative.mockResolvedValue({ id: 'initiative-id' });
+
+    await service.updateTeamInitiative('team-id', 'initiative-id', {
+      name: 'Nueva iniciativa',
+      progressPercentage: 45,
+      plannedEndDate: '2026-12-31',
+    });
+
+    expect(repository.updateTeamInitiative).toHaveBeenCalledWith(
+      'team-id',
+      'initiative-id',
+      {
+        name: 'Nueva iniciativa',
+        progress_percentage: 45,
+        planned_end_date: '2026-12-31',
+      },
+    );
   });
 
   it('chooses the next planned sprint after the active sprint is closed', async () => {
