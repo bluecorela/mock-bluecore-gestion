@@ -36,7 +36,7 @@ jobs:
       - run:
           name: Install dependencies and compile NestJS
           command: |
-            npm ci
+            npm ci --include=dev
             npm run build
       - aws-cli/setup:
           role_arn: ${OIDC_ROL_ARN}
