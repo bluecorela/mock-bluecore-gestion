@@ -49,3 +49,20 @@ variable "vpc" {
     private_subnet_name_pattern = string
   })
 }
+
+variable "app_env" {
+  description = "Environment variables injected into the application container."
+  type = object({
+    node_env                  = string
+    port                      = string
+    supabase_url              = string
+    supabase_service_role_key = string
+    supabase_anon_key         = string
+    supabase_v2_schema        = string
+    supabase_db_url           = string
+    auth_email_provider       = string
+    cors_origins              = string
+    frontend_url              = string
+    swagger_enabled           = string
+  })
+}

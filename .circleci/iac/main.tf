@@ -73,6 +73,7 @@ module "ecs" {
   aws_region         = var.aws_region
   desired_count      = var.ecs.desired_count
   container_port     = var.ecs.container_port
+  app_env            = var.app_env
   tags               = var.tags
 }
 

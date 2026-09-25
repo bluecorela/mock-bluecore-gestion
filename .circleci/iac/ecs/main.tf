@@ -61,14 +61,17 @@ resource "aws_ecs_task_definition" "web" {
         }
       ]
       environment = [
-        { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = "3000" },
-        { name = "SUPABASE_URL", value = "https://placeholder.supabase.co" },
-        { name = "SUPABASE_SERVICE_ROLE_KEY", value = "placeholder-service-key" },
-        { name = "SUPABASE_ANON_KEY", value = "placeholder-anon-key" },
-        { name = "CORS_ORIGINS", value = "*" },
-        { name = "FRONTEND_URL", value = "https://placeholder.example.com" },
-        { name = "SWAGGER_ENABLED", value = "true" }
+        { name = "NODE_ENV", value = var.app_env.node_env },
+        { name = "PORT", value = var.app_env.port },
+        { name = "SUPABASE_URL", value = var.app_env.supabase_url },
+        { name = "SUPABASE_SERVICE_ROLE_KEY", value = var.app_env.supabase_service_role_key },
+        { name = "SUPABASE_ANON_KEY", value = var.app_env.supabase_anon_key },
+        { name = "SUPABASE_V2_SCHEMA", value = var.app_env.supabase_v2_schema },
+        { name = "SUPABASE_DB_URL", value = var.app_env.supabase_db_url },
+        { name = "AUTH_EMAIL_PROVIDER", value = var.app_env.auth_email_provider },
+        { name = "CORS_ORIGINS", value = var.app_env.cors_origins },
+        { name = "FRONTEND_URL", value = var.app_env.frontend_url },
+        { name = "SWAGGER_ENABLED", value = var.app_env.swagger_enabled }
       ]
       logConfiguration = {
         logDriver = "awslogs"

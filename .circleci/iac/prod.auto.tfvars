@@ -39,3 +39,17 @@ vpc = {
   name                        = "mgmt-prod"
   private_subnet_name_pattern = "bluecore-gestion-prod-private-subnet-*"
 }
+
+app_env = {
+  node_env                  = "{NODE_ENV}"
+  port                      = "{PORT}"
+  supabase_url              = "{SUPABASE_URL}"
+  supabase_service_role_key = "{SUPABASE_SERVICE_ROLE_KEY}"
+  supabase_anon_key         = "{SUPABASE_ANON_KEY}"
+  supabase_v2_schema        = "{SUPABASE_V2_SCHEMA}"
+  supabase_db_url           = "{SUPABASE_DB_URL}"
+  auth_email_provider       = "{AUTH_EMAIL_PROVIDER}"
+  cors_origins              = "{CORS_ORIGINS}"
+  frontend_url              = "{FRONTEND_URL}"
+  swagger_enabled           = "{SWAGGER_ENABLED}"
+}

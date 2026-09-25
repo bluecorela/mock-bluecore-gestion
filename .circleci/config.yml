@@ -57,11 +57,15 @@ workflows:
   deploy-infra-and-app:
     jobs:
       - build-and-push:
-          context: aws
+          context:
+            - aws
+            - gestion
           # filters:
           #   branches:
           #     only: dev
       - deploy-terraform:
-          context: aws
+          context:
+            - aws
+            - gestion
           requires:
             - build-and-push
