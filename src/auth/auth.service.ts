@@ -82,14 +82,19 @@ export class AuthService {
       data.user.id,
     );
     if (!personnel) {
+      if (!data.user.email_confirmed_at) {
+        throw new UnauthorizedException('Correo no confirmado');
+      }
       personnel = await this.supabaseDataService.getPersonnelByEmail(
         data.user.email,
       );
       if (personnel) {
-        await this.supabaseDataService.linkPersonnelToAuthUser(
+        const linked = await this.supabaseDataService.linkPersonnelToAuthUser(
           personnel.id,
           data.user.id,
         );
+        if (!linked)
+          throw new UnauthorizedException('Perfil ya asociado a otra cuenta');
       }
     }
 
@@ -110,6 +115,7 @@ export class AuthService {
       name: personnel?.name ?? null,
       role: personnel?.role ?? null,
       teamId: personnel?.teamId ?? null,
+      teamIds: personnel?.teamIds ?? (personnel?.teamId ? [personnel.teamId] : []),
       mustChangePassword: data.user.user_metadata?.mustChangePassword === true,
     };
   }
@@ -242,38 +248,55 @@ export class AuthService {
       },
     );
 
-    const authEmail = data.email ?? currentPersonnel.email;
-    const authUser = await this.findLinkedAuthUser(
-      personnelId,
-      currentPersonnel.email,
-      authEmail,
-    );
-
-    if (authUser) {
-      return this.updateExistingAuthUser(
-        authUser,
-        data,
-        currentPersonnel,
-        updatedPersonnel,
-      );
-    }
-
-    if (data.password) {
-      return this.createAuthAccess(
+    try {
+      const authEmail = data.email ?? currentPersonnel.email;
+      const authUser = await this.findLinkedAuthUser(
         personnelId,
-        authEmail,
-        data,
-        data.password,
-        currentPersonnel,
-        updatedPersonnel,
+        currentPersonnel.email,
       );
-    }
 
-    return {
-      ok: true,
-      user: updatedPersonnel,
-      emailSent: false,
-    };
+      if (authUser) {
+        return await this.updateExistingAuthUser(
+          authUser,
+          data,
+          currentPersonnel,
+          updatedPersonnel,
+        );
+      }
+
+      if (data.password) {
+        return await this.createAuthAccess(
+          personnelId,
+          authEmail,
+          data,
+          data.password,
+          currentPersonnel,
+          updatedPersonnel,
+        );
+      }
+
+      return { ok: true, user: updatedPersonnel, emailSent: false };
+    } catch (error) {
+      try {
+        await this.supabaseDataService.updatePersonnel(personnelId, {
+          name: currentPersonnel.name ?? undefined,
+          role: currentPersonnel.role ?? undefined,
+          email: currentPersonnel.email,
+          teamId: currentPersonnel.teamId,
+          status: currentPersonnel.status ?? undefined,
+          createdBy: updatedBy,
+        });
+      } catch (rollbackError) {
+        console.error(
+          'No se pudo revertir la actualización del perfil',
+          rollbackError,
+        );
+        throw new BadRequestException(
+          'La actualización de Auth falló y no se pudo restaurar el perfil',
+        );
+      }
+      throw error;
+    }
   }
 
   private validateTeamAssignment(
@@ -296,14 +319,12 @@ export class AuthService {
   private async findLinkedAuthUser(
     personnelId: string,
     currentEmail: string | null,
-    effectiveEmail: string | null,
   ): Promise<User | null> {
     const authUserId =
       await this.supabaseDataService.getPersonnelAuthUserId(personnelId);
 
     if (authUserId) return this.findAuthUserById(authUserId);
     if (currentEmail) return this.findAuthUserByEmail(currentEmail);
-    if (effectiveEmail) return this.findAuthUserByEmail(effectiveEmail);
     return null;
   }
 
@@ -398,13 +419,29 @@ export class AuthService {
           mustChangePassword: true,
         },
       });
-    if (error) throw new BadRequestException(error.message);
+    if (error || !createdAuthData.user)
+      throw new BadRequestException(
+        error?.message ?? 'No se pudo crear acceso en Auth',
+      );
 
-    if (createdAuthData.user) {
-      await this.supabaseDataService.linkPersonnelToAuthUser(
+    try {
+      const linked = await this.supabaseDataService.linkPersonnelToAuthUser(
         personnelId,
         createdAuthData.user.id,
       );
+      if (!linked)
+        throw new BadRequestException('Perfil ya asociado a otra cuenta');
+    } catch (error) {
+      const { error: deleteError } = await this.supabaseClient
+        .getClient()
+        .auth.admin.deleteUser(createdAuthData.user.id);
+      if (deleteError) {
+        console.error(
+          'No se pudo eliminar el usuario Auth sin perfil',
+          deleteError,
+        );
+      }
+      throw error;
     }
 
     const emailResult =
@@ -424,7 +461,7 @@ export class AuthService {
     };
   }
 
-  async markPasswordChanged(user: AuthenticatedUser) {
+  async markPasswordChanged(user: AuthenticatedUser, newPassword: string) {
     const authUser = await this.findAuthUserById(user.supabaseUserId);
 
     if (!authUser) {
@@ -434,6 +471,7 @@ export class AuthService {
     const { error } = await this.supabaseClient
       .getClient()
       .auth.admin.updateUserById(authUser.id, {
+        password: newPassword,
         user_metadata: {
           ...(authUser.user_metadata ?? {}),
           mustChangePassword: false,

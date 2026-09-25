@@ -3,11 +3,22 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
+import { randomUUID } from 'node:crypto';
+import type { NextFunction, Request, Response } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   app.enableShutdownHooks();
+
+  app.use(helmet({ contentSecurityPolicy: false }));
+  app.use((request: Request, response: Response, next: NextFunction) => {
+    const requestId = request.header('x-request-id') || randomUUID();
+    request.headers['x-request-id'] = requestId;
+    response.setHeader('x-request-id', requestId);
+    next();
+  });
 
   app.setGlobalPrefix('api', {
     exclude: ['/', 'health', 'api', 'api/health'],

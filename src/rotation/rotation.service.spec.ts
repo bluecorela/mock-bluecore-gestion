@@ -35,6 +35,30 @@ describe('RotationService', () => {
     });
   });
 
+  it('includes a multi-team employee in the vacation pool context', async () => {
+    const multiTeamEmployee = {
+      id: 'replacement-code',
+      name: 'Replacement',
+      role: 'Ingeniero de Software',
+      email: null,
+      teamId: 'delivery-team',
+      teamIds: ['delivery-team', 'pool-de-vacaciones'],
+      status: 'activo' as const,
+      onVacation: false,
+      replacementStartSprintId: null,
+    };
+    Object.assign(dataService, {
+      getTeams: jest.fn().mockResolvedValue([]),
+      getPersonnel: jest.fn().mockResolvedValue([multiTeamEmployee]),
+      getVacationingPersonnel: jest.fn().mockResolvedValue([]),
+      getRotationHistory: jest.fn().mockResolvedValue([]),
+    });
+
+    await expect(service.getContext()).resolves.toMatchObject({
+      vacationPool: [multiTeamEmployee],
+    });
+  });
+
   it('registers the replacement when starting a vacation', async () => {
     await service.sendOnVacation({
       personnelId: 'employee-code',

@@ -13,13 +13,17 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
-import { OrganizationModule } from './v2/organization/organization.module';
-import { WeeklyDashboardModule } from './v2/weekly-dashboard/weekly-dashboard.module';
-import { SprintsModule } from './v2/sprints/sprints.module';
+import { OrganizationModule } from './organization/organization.module';
+import { WeeklyDashboardModule } from './weekly-dashboard/weekly-dashboard.module';
+import { SprintsModule } from './sprints/sprints.module';
 import {
   environmentFilePaths,
   validateEnvironment,
 } from './config/environment';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { HealthModule } from './health/health.module';
+import { RequestLoggingInterceptor } from './observability/request-logging.interceptor';
 
 @Module({
   imports: [
@@ -29,6 +33,12 @@ import {
       envFilePath: environmentFilePaths(),
       validate: validateEnvironment,
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: 120,
+      },
+    ]),
     PersonnelModule,
     TeamsModule,
     RotationHistoryModule,
@@ -43,8 +53,19 @@ import {
     OrganizationModule,
     WeeklyDashboardModule,
     SprintsModule,
+    HealthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: RequestLoggingInterceptor,
+    },
+  ],
 })
 export class AppModule {}

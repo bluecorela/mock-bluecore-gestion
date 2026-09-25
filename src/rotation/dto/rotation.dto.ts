@@ -36,13 +36,12 @@ export class VacationDto {
   sourceTeamId: string;
 
   @ApiProperty({
-    description: 'ID del personal reemplazo (opcional)',
+    description: 'ID del reemplazo activo en el pool de vacaciones',
     example: 'person-999',
-    required: false,
   })
   @IsString()
-  @IsOptional()
-  replacementId?: string;
+  @IsNotEmpty()
+  replacementId: string;
 }
 
 export class ReintegrateDto {

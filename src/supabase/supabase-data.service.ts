@@ -14,6 +14,10 @@ import {
 } from './interfaces/supabase-interface';
 import { CreatePerformanceEvaluationDto } from '../performance/dto/performance-evaluation.dto';
 import { CreateOtoEvaluationDto } from '../oto/dto/create-oto-evaluation.dto';
+import { ForbiddenException } from '@nestjs/common';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { TeamDirectoryRepository } from './repositories/team-directory.repository';
+import { NavigationRepository } from './repositories/navigation.repository';
 
 interface RoleSummaryRow {
   id: string;
@@ -78,21 +82,6 @@ interface SprintRow {
   status: string;
 }
 
-interface SidebarRoleAssignmentRow {
-  module_id: string;
-  role_id: string;
-}
-
-interface SidebarModuleRow {
-  id: string;
-  code: string;
-  name: string;
-  route: string;
-  icon: string;
-  display_order: number;
-  is_visible: boolean;
-}
-
 interface PerformanceAnswerRow {
   evaluation_id: string;
   question_key: string;
@@ -115,7 +104,24 @@ interface PerformanceEvaluationRow {
 
 @Injectable()
 export class SupabaseDataService {
-  constructor(private readonly supabaseClient: SupabaseClient) {}
+  constructor(
+    private readonly supabaseClient: SupabaseClient,
+    private readonly teamDirectory: TeamDirectoryRepository,
+    private readonly navigation: NavigationRepository,
+  ) {}
+
+  async assertLegacyTeamAccess(
+    teamId: string,
+    user: AuthenticatedUser,
+  ): Promise<void> {
+    if (user.role === 'Admin') return;
+    if (!user.personnelId)
+      throw new ForbiddenException('No tiene acceso a este equipo');
+    const members = await this.getEmployeeByTeam(teamId);
+    if (!members.some((member) => member.id === user.personnelId)) {
+      throw new ForbiddenException('No tiene acceso a este equipo');
+    }
+  }
 
   private slug(value: string): string {
     return value
@@ -131,89 +137,20 @@ export class SupabaseDataService {
     return parts.length > 1 ? parseInt(parts[1], 10) : 0;
   }
 
-  async getTeams(onlyWithEvaluations = false): Promise<Team[]> {
-    const database = this.supabaseClient.getV2Client();
-    if (onlyWithEvaluations) {
-      const { data: metrics, error: metricsError } = await database
-        .from('sprint_member_metrics')
-        .select('sprint_id');
-      if (metricsError) throw metricsError;
-      const sprintIds = [
-        ...new Set((metrics ?? []).map((metric) => metric.sprint_id)),
-      ];
-      if (!sprintIds.length) return [];
-      const { data: sprints, error: sprintsError } = await database
-        .from('sprints')
-        .select('team_id')
-        .in('id', sprintIds);
-      if (sprintsError) throw sprintsError;
-      const teamIds = [
-        ...new Set((sprints ?? []).map((sprint) => sprint.team_id)),
-      ];
-      if (!teamIds.length) return [];
-      const { data, error } = await database
-        .from('teams')
-        .select('code,name')
-        .in('id', teamIds)
-        .is('deleted_at', null)
-        .order('name', { ascending: true });
-      if (error) throw error;
-      return (data ?? []).map((team) => ({ id: team.code, name: team.name }));
-    }
-
-    const query = database
-      .from('teams')
-      .select('code,name')
-      .is('deleted_at', null);
-    const { data, error } = await query.order('name', { ascending: true });
-    if (error) throw error;
-    return (data ?? []).map((team) => ({ id: team.code, name: team.name }));
+  getTeams(onlyWithEvaluations = false): Promise<Team[]> {
+    return this.teamDirectory.getTeams(onlyWithEvaluations);
   }
 
-  async getTeam(teamId: string): Promise<Team | null> {
-    const { data, error } = await this.supabaseClient
-      .getV2Client()
-      .from('teams')
-      .select('code,name')
-      .ilike('code', teamId)
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { id: data.code, name: data.name } : null;
+  getTeam(teamId: string): Promise<Team | null> {
+    return this.teamDirectory.getTeam(teamId);
   }
 
-  async findTeamByName(name: string): Promise<Team | null> {
-    const { data, error } = await this.supabaseClient
-      .getV2Client()
-      .from('teams')
-      .select('code,name')
-      .ilike('name', name)
-      .is('deleted_at', null)
-      .maybeSingle();
-    if (error) throw error;
-    return data ? { id: data.code, name: data.name } : null;
+  findTeamByName(name: string): Promise<Team | null> {
+    return this.teamDirectory.findTeamByName(name);
   }
 
-  async createTeam(name: string): Promise<{ id: string; name: string }> {
-    const teamId = this.slug(name);
-    const [existingCode, existingName] = await Promise.all([
-      this.getTeam(teamId),
-      this.findTeamByName(name),
-    ]);
-    if (existingCode || existingName)
-      throw new Error('Ya existe un equipo con ese nombre');
-    const { data, error } = await this.supabaseClient
-      .getV2Client()
-      .from('teams')
-      .insert({
-        code: teamId,
-        name,
-        status: 'active',
-      })
-      .select('code,name')
-      .single();
-    if (error) throw error;
-    return { id: data.code, name: data.name };
+  createTeam(name: string): Promise<{ id: string; name: string }> {
+    return this.teamDirectory.createTeam(name);
   }
 
   async getPersonnel(): Promise<Personnel[]> {
@@ -224,12 +161,12 @@ export class SupabaseDataService {
     const { data, error } = await this.supabaseClient
       .getV2Client()
       .from('employees')
-      .select('id')
+      .select('id,email')
       .ilike('email', email)
       .is('deleted_at', null)
       .maybeSingle();
     if (error) throw error;
-    if (!data) return null;
+    if (!data || data.email.toLowerCase() !== email.toLowerCase()) return null;
     return (await this.getV2Personnel([data.id]))[0] ?? null;
   }
 
@@ -366,13 +303,14 @@ export class SupabaseDataService {
         );
       }
     }
-    const teamByEmployee = new Map<string, TeamSummaryRow | undefined>();
+    const teamsByEmployee = new Map<string, TeamSummaryRow[]>();
     for (const membership of teamMemberships) {
-      if (!teamByEmployee.has(membership.employee_id)) {
-        teamByEmployee.set(
-          membership.employee_id,
-          teamsById.get(membership.team_id),
-        );
+      const team = teamsById.get(membership.team_id);
+      if (!team) continue;
+      const employeeTeams = teamsByEmployee.get(membership.employee_id) ?? [];
+      if (!employeeTeams.some((candidate) => candidate.id === team.id)) {
+        employeeTeams.push(team);
+        teamsByEmployee.set(membership.employee_id, employeeTeams);
       }
     }
     const vacationingIds = new Set(
@@ -390,13 +328,15 @@ export class SupabaseDataService {
     const personnelRows = employees as PersonnelRow[];
     return personnelRows.map((employee) => {
       const role = primaryRoleByEmployee.get(employee.id);
-      const team = teamByEmployee.get(employee.id);
+      const employeeTeams = teamsByEmployee.get(employee.id) ?? [];
+      const team = employeeTeams[0];
       return {
         id: employee.employee_code ?? employee.id,
         name: employee.full_name,
         role: role ? (legacyRoles[role.code] ?? role.name) : null,
         email: employee.email,
         teamId: team?.code ?? null,
+        teamIds: employeeTeams.map((item) => item.code),
         status: employee.status === 'inactive' ? 'inactivo' : 'activo',
         onVacation: vacationingIds.has(employee.id),
         replacementStartSprintId: null,
@@ -407,6 +347,11 @@ export class SupabaseDataService {
               referencePath: `teams/${team.code}`,
             }
           : null,
+        teams: employeeTeams.map((item) => ({
+          id: item.code,
+          path: `teams/${item.code}`,
+          referencePath: `teams/${item.code}`,
+        })),
       };
     });
   }
@@ -533,17 +478,21 @@ export class SupabaseDataService {
   async linkPersonnelToAuthUser(
     personnelId: string,
     authUserId: string,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const employee = await this.resolveV2Employee(personnelId);
-    const { error } = await this.supabaseClient
+    const { data, error } = await this.supabaseClient
       .getV2Client()
       .from('employees')
       .update({
         auth_user_id: authUserId,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', employee.id);
+      .eq('id', employee.id)
+      .is('auth_user_id', null)
+      .select('id')
+      .maybeSingle();
     if (error) throw error;
+    return !!data;
   }
 
   async getSprintsByTeam(teamId: string): Promise<Sprint[]> {
@@ -565,8 +514,13 @@ export class SupabaseDataService {
     const team = await this.resolveV2Team(teamId);
     const sprintNumber = this.getSprintNumero(sprintId);
     let query = database.from('sprints').select('*').eq('team_id', team.id);
-    query =
-      sprintNumber > 0
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        sprintId,
+      );
+    query = isUuid
+      ? query.eq('id', sprintId)
+      : sprintNumber > 0
         ? query.eq('sprint_number', sprintNumber)
         : query.eq('name', sprintId);
     const { data, error } = await query.maybeSingle();
@@ -749,109 +703,16 @@ export class SupabaseDataService {
     return { ok: true, movementId };
   }
 
-  async getModulesByRole(role: string): Promise<SidebarModule[]> {
-    const database = this.supabaseClient.getV2Client();
-    const roleCodes: Record<string, string> = {
-      Admin: 'ADMIN',
-      Arquitecto: 'ARCHITECT',
-      'Scrum Master': 'SCRUM_MASTER',
-      'Ingeniero de Software': 'SOFTWARE_ENGINEER',
-      'Ingeniero de QA': 'QA_ENGINEER',
-      'Ingeniero QA': 'QA_ENGINEER',
-      'Creador de Bienestar': 'WELLBEING_CREATOR',
-      Pasante: 'INTERN',
-    };
-    const roleCode = roleCodes[role] ?? role.toUpperCase();
-    const { data: roleRecord, error: roleError } = await database
-      .from('roles')
-      .select('id,code')
-      .eq('code', roleCode)
-      .maybeSingle();
-    if (roleError) throw roleError;
-    if (!roleRecord) return [];
-
-    const { data: permissions, error: permissionError } = await database
-      .from('sidebar_module_roles')
-      .select('module_id')
-      .eq('role_id', roleRecord.id);
-    if (permissionError) throw permissionError;
-    const moduleIds = (permissions ?? []).map(
-      (permission) => permission.module_id,
-    );
-    if (!moduleIds.length) return [];
-
-    const { data: modules, error } = await database
-      .from('sidebar_modules')
-      .select('*')
-      .in('id', moduleIds)
-      .eq('is_visible', true)
-      .order('display_order', { ascending: true });
-    if (error) throw error;
-    return (modules ?? []).map((moduleItem) => ({
-      id: moduleItem.id,
-      name: moduleItem.name,
-      route: moduleItem.route,
-      icon: moduleItem.icon,
-      order: moduleItem.display_order,
-      visible: moduleItem.is_visible,
-      permittedRoles: [role],
-    }));
+  getModulesByRole(role: string): Promise<SidebarModule[]> {
+    return this.navigation.getModulesByRole(role);
   }
 
-  async getSidebarConfiguration() {
-    const database = this.supabaseClient.getV2Client();
-    const [
-      { data: modules, error: moduleError },
-      { data: assignments, error: assignmentError },
-      { data: roles, error: roleError },
-    ] = await Promise.all([
-      database.from('sidebar_modules').select('*').order('display_order'),
-      database.from('sidebar_module_roles').select('module_id,role_id'),
-      database.from('roles').select('id,code,name').order('name'),
-    ]);
-    if (moduleError) throw moduleError;
-    if (assignmentError) throw assignmentError;
-    if (roleError) throw roleError;
-    const roleRows = (roles ?? []) as RoleSummaryRow[];
-    const assignmentRows = (assignments ?? []) as SidebarRoleAssignmentRow[];
-    const moduleRows = (modules ?? []) as SidebarModuleRow[];
-    const rolesById = new Map(roleRows.map((role) => [role.id, role]));
-    const roleCodesByModule = new Map<string, string[]>();
-    for (const assignment of assignmentRows) {
-      const role = rolesById.get(assignment.role_id);
-      if (!role) continue;
-      const codes = roleCodesByModule.get(assignment.module_id) ?? [];
-      codes.push(role.code);
-      roleCodesByModule.set(assignment.module_id, codes);
-    }
-    return {
-      modules: moduleRows.map((moduleItem) => ({
-        id: moduleItem.id,
-        code: moduleItem.code,
-        name: moduleItem.name,
-        route: moduleItem.route,
-        icon: moduleItem.icon,
-        displayOrder: moduleItem.display_order,
-        isVisible: moduleItem.is_visible,
-        roleCodes: roleCodesByModule.get(moduleItem.id) ?? [],
-      })),
-      roles: roleRows.map((role) => ({
-        code: role.code,
-        name: role.name,
-      })),
-    };
+  getSidebarConfiguration() {
+    return this.navigation.getSidebarConfiguration();
   }
 
-  async saveSidebarModule(input: object) {
-    const { data: moduleId, error } = await this.supabaseClient
-      .getV2Client()
-      .rpc('save_sidebar_module', { p_payload: input });
-    if (error) throw error;
-    const configuration = await this.getSidebarConfiguration();
-    return (
-      configuration.modules.find((moduleItem) => moduleItem.id === moduleId) ??
-      null
-    );
+  saveSidebarModule(input: object) {
+    return this.navigation.saveSidebarModule(input);
   }
 
   async getMaintenanceStatus(): Promise<MaintenanceStatus> {
@@ -1184,17 +1045,19 @@ export class SupabaseDataService {
   }
 
   private async resolveV2Team(teamIdOrName: string): Promise<TeamSummaryRow> {
-    const { data, error } = await this.supabaseClient
-      .getV2Client()
-      .from('teams')
-      .select('id,code,name')
-      .or(`code.eq.${teamIdOrName},name.eq.${teamIdOrName}`)
-      .is('deleted_at', null)
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-    if (!data) throw new Error(`Team not found: ${teamIdOrName}`);
-    return data as TeamSummaryRow;
+    const database = this.supabaseClient.getV2Client();
+    for (const column of ['code', 'name'] as const) {
+      const { data, error } = await database
+        .from('teams')
+        .select('id,code,name')
+        .eq(column, teamIdOrName)
+        .is('deleted_at', null)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) return data as TeamSummaryRow;
+    }
+    throw new Error(`Team not found: ${teamIdOrName}`);
   }
 
   private async resolveV2EmployeeByName(fullName: string) {
@@ -1207,7 +1070,8 @@ export class SupabaseDataService {
       .limit(1)
       .maybeSingle();
     if (error) throw error;
-    if (!data) throw new Error(`Employee not found: ${fullName}`);
+    if (!data || data.full_name.toLowerCase() !== fullName.toLowerCase())
+      throw new Error(`Employee not found: ${fullName}`);
     return data;
   }
 
@@ -1524,6 +1388,7 @@ export class SupabaseDataService {
           startDate: data.startDate,
           endDate: data.endDate,
           employeeName: engineerName,
+          employeeId: data.employeeId,
           evaluatorEmail: data.evaluatorEmail,
           metrics: data.metrics ?? {},
           finalScore: data.finalScore,

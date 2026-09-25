@@ -11,6 +11,7 @@ describe('AuthService', () => {
   const authUser = {
     id: 'auth-user-id',
     email: 'ana@bluecorela.com',
+    email_confirmed_at: '2026-09-18T00:00:00Z',
     user_metadata: { mustChangePassword: true },
   };
   const personnel = {
@@ -74,6 +75,7 @@ describe('AuthService', () => {
   it('links a migrated profile found by email', async () => {
     jest.spyOn(dataService, 'getPersonnelByAuthUserId').mockResolvedValue(null);
     jest.spyOn(dataService, 'getPersonnelByEmail').mockResolvedValue(personnel);
+    jest.spyOn(dataService, 'linkPersonnelToAuthUser').mockResolvedValue(true);
 
     await service.validateAccessToken('token');
 
@@ -81,6 +83,27 @@ describe('AuthService', () => {
       personnel.id,
       authUser.id,
     );
+  });
+
+  it('rejects a profile already linked to another Auth account', async () => {
+    jest.spyOn(dataService, 'getPersonnelByAuthUserId').mockResolvedValue(null);
+    jest.spyOn(dataService, 'getPersonnelByEmail').mockResolvedValue(personnel);
+    jest.spyOn(dataService, 'linkPersonnelToAuthUser').mockResolvedValue(false);
+    await expect(service.validateAccessToken('token')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+  });
+
+  it('does not link a migrated profile before email confirmation', async () => {
+    authApi.getUser.mockResolvedValue({
+      data: { user: { ...authUser, email_confirmed_at: null } },
+      error: null,
+    });
+    jest.spyOn(dataService, 'getPersonnelByAuthUserId').mockResolvedValue(null);
+    await expect(service.validateAccessToken('token')).rejects.toBeInstanceOf(
+      UnauthorizedException,
+    );
+    expect(dataService.getPersonnelByEmail).not.toHaveBeenCalled();
   });
 
   it('rejects an Auth user without a personnel profile', async () => {
@@ -204,6 +227,50 @@ describe('AuthService', () => {
     );
   });
 
+  it('restores the personnel profile when the Auth update fails', async () => {
+    jest.spyOn(dataService, 'getPersonnelById').mockResolvedValue(personnel);
+    jest
+      .spyOn(dataService, 'updatePersonnel')
+      .mockResolvedValue({ ...personnel, name: 'Nuevo nombre' });
+    jest
+      .spyOn(dataService, 'getPersonnelAuthUserId')
+      .mockResolvedValue(authUser.id);
+    authApi.admin.getUserById.mockResolvedValue({
+      data: { user: authUser },
+      error: null,
+    });
+    authApi.admin.updateUserById.mockResolvedValue({
+      error: new Error('Auth unavailable'),
+    });
+
+    await expect(
+      service.updateUser(personnel.id, { name: 'Nuevo nombre' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(dataService.updatePersonnel).toHaveBeenLastCalledWith(
+      personnel.id,
+      expect.objectContaining({ name: personnel.name }),
+    );
+  });
+
+  it('changes the password before clearing the initial-change flag', async () => {
+    authApi.admin.getUserById.mockResolvedValue({
+      data: { user: authUser },
+      error: null,
+    });
+    authApi.admin.updateUserById.mockResolvedValue({ error: null });
+    await service.markPasswordChanged(
+      { supabaseUserId: authUser.id } as never,
+      'NewPassword123!',
+    );
+    expect(authApi.admin.updateUserById).toHaveBeenCalledWith(
+      authUser.id,
+      expect.objectContaining({
+        password: 'NewPassword123!',
+        user_metadata: expect.objectContaining({ mustChangePassword: false }),
+      }),
+    );
+  });
+
   it('creates and links Supabase Auth access for personnel without an account', async () => {
     const updatedPersonnel = {
       ...personnel,
@@ -222,6 +289,7 @@ describe('AuthService', () => {
       data: { user: { id: 'new-auth-user-id' } },
       error: null,
     });
+    jest.spyOn(dataService, 'linkPersonnelToAuthUser').mockResolvedValue(true);
 
     await expect(
       service.updateUser(personnel.id, {

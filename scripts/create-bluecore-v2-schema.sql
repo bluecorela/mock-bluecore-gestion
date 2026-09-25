@@ -116,7 +116,7 @@ create table if not exists bluecore_v2.team_rotation_events (
 create table if not exists bluecore_v2.sprints (
   id uuid primary key default gen_random_uuid(), team_id uuid not null references bluecore_v2.teams(id),
   project_id uuid references bluecore_v2.projects(id), sprint_number integer not null check(sprint_number>0),
-  name text not null, start_date date not null, end_date date not null,
+  name text not null, objective text, start_date date not null, end_date date not null,
   status text not null default 'planned' check(status in ('planned','in_progress','completed','cancelled')),
   committed_points numeric(10,2) not null default 0 check(committed_points>=0),
   completed_points numeric(10,2) not null default 0 check(completed_points>=0),
@@ -124,6 +124,9 @@ create table if not exists bluecore_v2.sprints (
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
   unique(team_id,sprint_number), check(end_date>=start_date)
 );
+create unique index if not exists uq_team_active_sprint
+  on bluecore_v2.sprints(team_id)
+  where status = 'in_progress';
 create table if not exists bluecore_v2.sprint_member_metrics (
   id uuid primary key default gen_random_uuid(), sprint_id uuid not null references bluecore_v2.sprints(id) on delete cascade,
   employee_id uuid not null references bluecore_v2.employees(id), assigned_tasks integer not null default 0 check(assigned_tasks>=0),
@@ -178,6 +181,31 @@ create table if not exists bluecore_v2.quality_metrics (
   critical_defects integer not null default 0 check(critical_defects>=0), resolved_defects integer not null default 0 check(resolved_defects>=0),
   recorded_at timestamptz not null default now(), created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+
+create or replace function bluecore_v2.enforce_weekly_report_status_transition()
+returns trigger
+language plpgsql
+set search_path = bluecore_v2, public
+as $$
+begin
+  if old.status = 'submitted' and new.status not in ('submitted', 'approved', 'archived') then
+    raise exception 'A submitted weekly report cannot return to draft';
+  end if;
+  if old.status = 'approved' and new.status not in ('approved', 'archived') then
+    raise exception 'An approved weekly report can only be archived';
+  end if;
+  if old.status = 'archived' and new.status <> 'archived' then
+    raise exception 'An archived weekly report cannot change status';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_team_weekly_reports_status_transition
+  on bluecore_v2.team_weekly_reports;
+create trigger trg_team_weekly_reports_status_transition
+before update of status on bluecore_v2.team_weekly_reports
+for each row execute function bluecore_v2.enforce_weekly_report_status_transition();
 
 -- Evaluation templates
 create table if not exists bluecore_v2.evaluation_templates (
@@ -261,6 +289,7 @@ create index if not exists idx_employees_auth_user on bluecore_v2.employees(auth
 create index if not exists idx_team_memberships_team_active on bluecore_v2.team_memberships(team_id,is_active);
 create index if not exists idx_team_memberships_employee_active on bluecore_v2.team_memberships(employee_id,is_active);
 create unique index if not exists uq_active_team_membership on bluecore_v2.team_memberships(team_id,employee_id) where is_active;
+create unique index if not exists uq_active_employee_email_ci on bluecore_v2.employees(lower(email)) where deleted_at is null;
 create index if not exists idx_team_project_memberships_assignment_active on bluecore_v2.team_project_memberships(team_project_id,is_active);
 create index if not exists idx_team_project_memberships_employee_active on bluecore_v2.team_project_memberships(employee_id,is_active);
 create index if not exists idx_employee_absences_employee_dates on bluecore_v2.employee_absences(employee_id,start_date desc,end_date desc);
@@ -680,8 +709,12 @@ declare
   v_destination_team_id uuid;
   v_pool_team_id uuid;
   v_absence bluecore_v2.employee_absences%rowtype;
-  v_replacement_team_id uuid;
   v_replacement_role_id uuid;
+  v_coverage_memberships jsonb := '[]'::jsonb;
+  v_membership record;
+  v_item jsonb;
+  v_coverage_created boolean;
+  v_team_id uuid;
 begin
   if p_action not in ('rotate', 'vacation_start', 'vacation_end') then
     raise exception 'Unsupported employee movement action: %', p_action;
@@ -694,18 +727,22 @@ begin
     raise exception 'Active employee was not found';
   end if;
 
-  select membership.team_id, membership.role_id
-    into v_current_team_id, v_current_role_id
-  from bluecore_v2.team_memberships membership
-  where membership.employee_id = p_employee_id
-    and membership.is_active
-    and (p_source_team_id is null or membership.team_id = p_source_team_id)
-  order by membership.started_at desc
-  limit 1
-  for update;
+  if p_action in ('rotate', 'vacation_start') then
+    if p_source_team_id is null then
+      raise exception 'A source team is required when an employee can belong to multiple teams';
+    end if;
 
-  if p_action in ('rotate', 'vacation_start') and v_current_team_id is null then
-    raise exception 'The employee does not have an active membership in the source team';
+    select membership.team_id, membership.role_id
+      into v_current_team_id, v_current_role_id
+    from bluecore_v2.team_memberships membership
+    where membership.employee_id = p_employee_id
+      and membership.team_id = p_source_team_id
+      and membership.is_active
+    for update;
+
+    if v_current_team_id is null then
+      raise exception 'The employee does not have an active membership in the source team';
+    end if;
   end if;
 
   if p_action = 'rotate' then
@@ -718,12 +755,19 @@ begin
 
     update bluecore_v2.team_memberships
     set is_active = false, ended_at = current_date, updated_at = now()
-    where employee_id = p_employee_id and is_active;
+    where employee_id = p_employee_id
+      and team_id = v_current_team_id
+      and is_active;
 
     insert into bluecore_v2.team_memberships (
       team_id, employee_id, role_id, started_at, is_active, created_by
-    ) values (
+    ) select
       p_destination_team_id, p_employee_id, v_current_role_id, current_date, true, p_created_by
+    where not exists (
+      select 1 from bluecore_v2.team_memberships
+      where team_id = p_destination_team_id
+        and employee_id = p_employee_id
+        and is_active
     )
     on conflict (team_id, employee_id, started_at) do update set
       role_id = excluded.role_id,
@@ -742,13 +786,17 @@ begin
 
   select id into v_pool_team_id
   from bluecore_v2.teams
-  where code = 'pool-de-vacaciones' and deleted_at is null;
+  where code = 'pool-de-vacaciones' and status = 'active' and deleted_at is null;
 
   if v_pool_team_id is null then
     raise exception 'Vacation pool team was not found';
   end if;
 
   if p_action = 'vacation_start' then
+    if p_replacement_id is null or p_replacement_id = p_employee_id then
+      raise exception 'A different replacement employee is required';
+    end if;
+
     if exists (
       select 1 from bluecore_v2.employee_absences
       where employee_id = p_employee_id and status = 'active'
@@ -756,66 +804,103 @@ begin
       raise exception 'The employee already has an active absence';
     end if;
 
-    if p_replacement_id is not null then
-      if p_replacement_id = p_employee_id then
-        raise exception 'The replacement employee must be different from the absent employee';
-      end if;
+    if not exists (
+      select 1 from bluecore_v2.employees
+      where id = p_replacement_id and status = 'active' and deleted_at is null
+    ) then
+      raise exception 'Active replacement employee was not found';
+    end if;
 
+    select membership.role_id
+      into v_replacement_role_id
+    from bluecore_v2.team_memberships membership
+    where membership.employee_id = p_replacement_id
+      and membership.team_id = v_pool_team_id
+      and membership.is_active
+    for update;
+
+    if not found then
+      raise exception 'The replacement employee must have an active vacation pool membership';
+    end if;
+
+    update bluecore_v2.team_memberships
+    set is_active = false, ended_at = current_date, updated_at = now()
+    where employee_id = p_replacement_id
+      and team_id = v_pool_team_id
+      and is_active;
+
+    for v_membership in
       select membership.team_id, membership.role_id
-        into v_replacement_team_id, v_replacement_role_id
       from bluecore_v2.team_memberships membership
-      where membership.employee_id = p_replacement_id and membership.is_active
-      order by membership.started_at desc
-      limit 1
-      for update;
+      join bluecore_v2.teams team on team.id = membership.team_id
+      where membership.employee_id = p_employee_id
+        and membership.is_active
+        and membership.team_id <> v_pool_team_id
+        and team.status = 'active'
+        and team.deleted_at is null
+      order by membership.started_at, membership.team_id
+    loop
+      select not exists (
+        select 1 from bluecore_v2.team_memberships
+        where team_id = v_membership.team_id
+          and employee_id = p_replacement_id
+          and is_active
+      ) into v_coverage_created;
 
-      if v_replacement_team_id is null then
-        raise exception 'The replacement employee does not have an active team membership';
+      if v_coverage_created then
+        insert into bluecore_v2.team_memberships (
+          team_id, employee_id, role_id, started_at, is_active, created_by
+        ) values (
+          v_membership.team_id, p_replacement_id, v_replacement_role_id,
+          current_date, true, p_created_by
+        )
+        on conflict (team_id, employee_id, started_at) do update set
+          role_id = excluded.role_id,
+          ended_at = null,
+          is_active = true,
+          updated_at = now();
       end if;
 
-      update bluecore_v2.team_memberships
-      set is_active = false, ended_at = current_date, updated_at = now()
-      where employee_id = p_replacement_id and is_active;
-
-      insert into bluecore_v2.team_memberships (
-        team_id, employee_id, role_id, started_at, is_active, created_by
-      ) values (
-        v_current_team_id, p_replacement_id, v_replacement_role_id, current_date, true, p_created_by
-      )
-      on conflict (team_id, employee_id, started_at) do update set
-        role_id = excluded.role_id,
-        ended_at = null,
-        is_active = true,
-        updated_at = now();
+      v_coverage_memberships := v_coverage_memberships || jsonb_build_array(
+        jsonb_build_object(
+          'teamId', v_membership.team_id,
+          'membershipCreated', v_coverage_created
+        )
+      );
 
       insert into bluecore_v2.team_rotation_events (
-        employee_id, from_team_id, to_team_id, event_type, effective_at, created_by,
-        metadata
+        employee_id, from_team_id, to_team_id, event_type, effective_at,
+        created_by, metadata
       ) values (
-        p_replacement_id, v_replacement_team_id, v_current_team_id, 'assignment', now(), p_created_by,
+        p_replacement_id, v_pool_team_id, v_membership.team_id, 'assignment',
+        now(), p_created_by,
         jsonb_build_object('reason', 'vacation_coverage', 'absentEmployeeId', p_employee_id)
       );
+
+      insert into bluecore_v2.team_rotation_events (
+        employee_id, from_team_id, to_team_id, event_type, effective_at,
+        created_by, metadata
+      ) values (
+        p_employee_id, v_membership.team_id, v_pool_team_id, 'vacation_start',
+        now(), p_created_by, jsonb_build_object('replacementEmployeeId', p_replacement_id)
+      );
+    end loop;
+
+    if jsonb_array_length(v_coverage_memberships) = 0 then
+      raise exception 'The employee does not have active teams to cover';
     end if;
 
     insert into bluecore_v2.employee_absences (
       employee_id, team_id, absence_type, start_date, status, reason,
       replacement_employee_id, created_by, metadata
     ) values (
-      p_employee_id, v_current_team_id, 'vacation', current_date, 'active',
+      p_employee_id, p_source_team_id, 'vacation', current_date, 'active',
       'Vacation registered from the application', p_replacement_id, p_created_by,
       jsonb_build_object(
-        'replacementOriginalTeamId', v_replacement_team_id,
-        'replacementOriginalRoleId', v_replacement_role_id
+        'replacementPoolRoleId', v_replacement_role_id,
+        'coverageMemberships', v_coverage_memberships
       )
     ) returning id into v_result_id;
-
-    insert into bluecore_v2.team_rotation_events (
-      employee_id, from_team_id, to_team_id, event_type, effective_at, created_by,
-      metadata
-    ) values (
-      p_employee_id, v_current_team_id, v_pool_team_id, 'vacation_start', now(), p_created_by,
-      jsonb_build_object('absenceId', v_result_id)
-    );
 
     return v_result_id;
   end if;
@@ -833,67 +918,69 @@ begin
     raise exception 'An active vacation absence was not found';
   end if;
 
-  v_destination_team_id := coalesce(p_destination_team_id, v_absence.team_id);
-  if v_destination_team_id is null then
-    raise exception 'A destination team is required to end the vacation';
-  end if;
-
   update bluecore_v2.employee_absences
   set status = 'completed', end_date = current_date, updated_at = now()
   where id = v_absence.id;
 
-  if v_current_team_id is distinct from v_destination_team_id then
-    update bluecore_v2.team_memberships
-    set is_active = false, ended_at = current_date, updated_at = now()
-    where employee_id = p_employee_id and is_active;
+  if v_absence.replacement_employee_id is not null then
+    for v_item in
+      select value
+      from jsonb_array_elements(coalesce(v_absence.metadata->'coverageMemberships', '[]'::jsonb))
+    loop
+      v_team_id := nullif(v_item->>'teamId', '')::uuid;
+      v_coverage_created := coalesce((v_item->>'membershipCreated')::boolean, false);
+
+      if v_team_id is not null and v_coverage_created then
+        update bluecore_v2.team_memberships
+        set is_active = false, ended_at = current_date, updated_at = now()
+        where employee_id = v_absence.replacement_employee_id
+          and team_id = v_team_id
+          and is_active;
+
+        insert into bluecore_v2.team_rotation_events (
+          employee_id, from_team_id, to_team_id, event_type, effective_at,
+          created_by, metadata
+        ) values (
+          v_absence.replacement_employee_id, v_team_id, v_pool_team_id,
+          'unassignment', now(), p_created_by,
+          jsonb_build_object('reason', 'vacation_coverage_ended', 'absenceId', v_absence.id)
+        ) returning id into v_result_id;
+      end if;
+
+      if v_team_id is not null then
+        insert into bluecore_v2.team_rotation_events (
+          employee_id, from_team_id, to_team_id, event_type, effective_at,
+          created_by, metadata
+        ) values (
+          p_employee_id, v_pool_team_id, v_team_id, 'vacation_end', now(),
+          p_created_by, jsonb_build_object('absenceId', v_absence.id)
+        ) returning id into v_result_id;
+      end if;
+    end loop;
 
     insert into bluecore_v2.team_memberships (
       team_id, employee_id, role_id, started_at, is_active, created_by
-    ) values (
-      v_destination_team_id, p_employee_id, v_current_role_id, current_date, true, p_created_by
+    ) select
+      v_pool_team_id,
+      v_absence.replacement_employee_id,
+      nullif(v_absence.metadata->>'replacementPoolRoleId', '')::uuid,
+      current_date,
+      true,
+      p_created_by
+    where not exists (
+      select 1 from bluecore_v2.team_memberships
+      where team_id = v_pool_team_id
+        and employee_id = v_absence.replacement_employee_id
+        and is_active
     )
     on conflict (team_id, employee_id, started_at) do update set
-      role_id = excluded.role_id, ended_at = null, is_active = true, updated_at = now();
+      role_id = excluded.role_id,
+      ended_at = null,
+      is_active = true,
+      updated_at = now();
   end if;
 
-  if v_absence.replacement_employee_id is not null then
-    v_replacement_team_id := nullif(v_absence.metadata->>'replacementOriginalTeamId', '')::uuid;
-    v_replacement_role_id := nullif(v_absence.metadata->>'replacementOriginalRoleId', '')::uuid;
-
-    if v_replacement_team_id is not null then
-      update bluecore_v2.team_memberships
-      set is_active = false, ended_at = current_date, updated_at = now()
-      where employee_id = v_absence.replacement_employee_id and is_active;
-
-      insert into bluecore_v2.team_memberships (
-        team_id, employee_id, role_id, started_at, is_active, created_by
-      ) values (
-        v_replacement_team_id, v_absence.replacement_employee_id,
-        v_replacement_role_id, current_date, true, p_created_by
-      )
-      on conflict (team_id, employee_id, started_at) do update set
-        role_id = excluded.role_id, ended_at = null, is_active = true, updated_at = now();
-
-      insert into bluecore_v2.team_rotation_events (
-        employee_id, from_team_id, to_team_id, event_type, effective_at, created_by,
-        metadata
-      ) values (
-        v_absence.replacement_employee_id, v_absence.team_id, v_replacement_team_id,
-        'unassignment', now(), p_created_by,
-        jsonb_build_object('reason', 'vacation_coverage_ended', 'absenceId', v_absence.id)
-      );
-    end if;
-  end if;
-
-  insert into bluecore_v2.team_rotation_events (
-    employee_id, from_team_id, to_team_id, event_type, effective_at, created_by,
-    metadata
-  ) values (
-    p_employee_id, v_pool_team_id, v_destination_team_id, 'vacation_end', now(), p_created_by,
-    jsonb_build_object('absenceId', v_absence.id)
-  ) returning id into v_result_id;
-
-  return v_result_id;
+  return coalesce(v_result_id, v_absence.id);
 end;
 $$;
 
@@ -1159,41 +1246,30 @@ begin
       end if;
     end if;
 
-    select membership.team_id into v_current_team_id
-    from bluecore_v2.team_memberships membership
-    where membership.employee_id = v_employee_id
-      and membership.is_active = true
-    order by membership.started_at desc
-    limit 1;
+    if v_team_id is not null and not exists (
+      select 1 from bluecore_v2.team_memberships
+      where employee_id = v_employee_id
+        and team_id = v_team_id
+        and is_active
+    ) then
+      select role_id into v_role_id
+      from bluecore_v2.employee_roles
+      where employee_id = v_employee_id and ended_at is null
+      order by is_primary desc, started_at desc
+      limit 1;
 
-    if v_current_team_id is distinct from v_team_id then
-      update bluecore_v2.team_memberships
+      insert into bluecore_v2.team_memberships (
+        team_id, employee_id, role_id, started_at, is_active, created_by
+      ) values (
+        v_team_id, v_employee_id, v_role_id, v_effective_date, true, v_created_by
+      )
+      on conflict (team_id, employee_id, started_at) do update
       set
-        ended_at = v_effective_date,
-        is_active = false,
-        updated_at = now()
-      where employee_id = v_employee_id and is_active = true;
-
-      if v_team_id is not null then
-        select role_id into v_role_id
-        from bluecore_v2.employee_roles
-        where employee_id = v_employee_id and ended_at is null
-        order by is_primary desc, started_at desc
-        limit 1;
-
-        insert into bluecore_v2.team_memberships (
-          team_id, employee_id, role_id, started_at, is_active, created_by
-        ) values (
-          v_team_id, v_employee_id, v_role_id, v_effective_date, true, v_created_by
-        )
-        on conflict (team_id, employee_id, started_at) do update
-        set
-          role_id = excluded.role_id,
-          ended_at = null,
-          is_active = true,
-          created_by = coalesce(excluded.created_by, bluecore_v2.team_memberships.created_by),
-          updated_at = now();
-      end if;
+        role_id = excluded.role_id,
+        ended_at = null,
+        is_active = true,
+        created_by = coalesce(excluded.created_by, bluecore_v2.team_memberships.created_by),
+        updated_at = now();
     end if;
   end if;
 
@@ -1241,7 +1317,11 @@ begin
 
   select employee.id into v_employee_id
   from bluecore_v2.employees employee
-  where lower(btrim(employee.full_name)) = lower(btrim(p_payload->>'employeeName'))
+  join bluecore_v2.team_memberships membership
+    on membership.employee_id = employee.id
+   and membership.team_id = v_team_id
+   and membership.is_active = true
+  where employee.id = nullif(p_payload->>'employeeId', '')::uuid
     and employee.deleted_at is null;
   if not found then raise exception 'Employee % does not exist', p_payload->>'employeeName'; end if;
 

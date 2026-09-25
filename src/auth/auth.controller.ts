@@ -23,6 +23,8 @@ import { AdminGuard } from './admin.guard';
 import { CreateAuthUserDto } from './dto/create-auth-user.dto';
 import { UpdateAuthUserDto } from './dto/update-auth-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { Throttle } from '@nestjs/throttler';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -30,6 +32,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({
     summary:
       'Obtener token para probar la API desde Swagger (solo desarrollo y pruebas)',
@@ -127,12 +130,15 @@ export class AuthController {
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Marcar cambio de contraseña inicial como completado',
+    summary: 'Cambiar contraseña inicial y marcar el cambio como completado',
   })
   @ApiResponse({ status: 200, description: 'Cambio marcado como completado' })
   @ApiResponse({ status: 401, description: 'Token inválido o ausente' })
-  markPasswordChanged(@CurrentUser() user: AuthenticatedUser) {
-    return this.authService.markPasswordChanged(user);
+  markPasswordChanged(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() body: ChangePasswordDto,
+  ) {
+    return this.authService.markPasswordChanged(user, body.newPassword);
   }
 
   @Patch('users/:id')

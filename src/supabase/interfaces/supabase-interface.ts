@@ -20,10 +20,12 @@ export interface Personnel {
   role: string | null;
   email: string | null;
   teamId: string | null;
+  teamIds?: string[];
   status: 'activo' | 'inactivo' | null;
   onVacation: boolean | null;
   replacementStartSprintId: string | null;
   team?: { id: string; path: string; referencePath: string } | null;
+  teams?: Array<{ id: string; path: string; referencePath: string }>;
 }
 
 export interface Sprint {
@@ -142,6 +144,7 @@ export interface TeamSprintResponse {
 
 export interface SaveEvaluationRequest {
   teamId: string;
+  employeeId: string;
   sprintId: string;
   startDate: string;
   endDate: string;

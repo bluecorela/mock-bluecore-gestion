@@ -17,10 +17,48 @@ describe('TeamsService', () => {
     getSprintsByTeam: jest.fn(),
     getRotationHistory: jest.fn(),
     getSprintEvaluationStatus: jest.fn(),
+    getSprint: jest.fn(),
+    getTeams: jest.fn(),
   } as unknown as SupabaseDataService;
   const service = new TeamsService(operationsService, dataService);
 
   beforeEach(() => jest.clearAllMocks());
+
+  it('returns every active team membership for a non-admin user', async () => {
+    jest.spyOn(dataService, 'getTeams').mockResolvedValue([
+      { id: 'team-a', name: 'Team A' },
+      { id: 'team-b', name: 'Team B' },
+      { id: 'team-c', name: 'Team C' },
+    ]);
+    jest
+      .spyOn(dataService, 'getEmployeeByTeam')
+      .mockImplementation(async (teamId: string) =>
+        teamId === 'team-c'
+          ? []
+          : [
+              {
+                id: 'employee-id',
+                name: 'Example Employee',
+                email: null,
+                role: null,
+                teamId,
+                status: 'activo',
+                onVacation: false,
+                replacementStartSprintId: null,
+              },
+            ],
+      );
+
+    await expect(
+      service.findAllForUser({
+        role: 'Arquitecto',
+        personnelId: 'employee-id',
+      } as never),
+    ).resolves.toEqual([
+      { id: 'team-a', name: 'Team A' },
+      { id: 'team-b', name: 'Team B' },
+    ]);
+  });
 
   it('sends a complete sprint evaluation to the data service', async () => {
     const evaluation = {
@@ -48,16 +86,58 @@ describe('TeamsService', () => {
         sprintClosed: false,
       },
     });
+    jest.spyOn(dataService, 'getSprint').mockResolvedValue({
+      id: 'sprint-id',
+      code: 'sprint-17',
+      team_id: 'sgb-evolucion',
+      start_date: '2026-08-03',
+      end_date: '2026-08-14',
+      sprint_closed: false,
+    });
+    jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([
+      {
+        id: 'employee-id',
+        name: 'Ana Pérez',
+        email: null,
+        role: null,
+        teamId: 'sgb-evolucion',
+        status: 'activo',
+        onVacation: false,
+        replacementStartSprintId: null,
+      },
+    ]);
 
     await expect(service.saveEvaluation(evaluation)).resolves.toMatchObject({
       ok: true,
     });
-    expect(dataService.saveEvaluation).toHaveBeenCalledWith(evaluation);
+    expect(dataService.saveEvaluation).toHaveBeenCalledWith({
+      ...evaluation,
+      employeeId: 'employee-id',
+    });
   });
 
   it('rejects an incomplete sprint evaluation', async () => {
     await expect(
       service.saveEvaluation({ teamId: 'sgb-evolucion' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(dataService.saveEvaluation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a sprint evaluation for someone outside the team', async () => {
+    jest.spyOn(dataService, 'getSprint').mockResolvedValue(null);
+    jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([]);
+    await expect(
+      service.saveEvaluation({
+        teamId: 'sgb-evolucion',
+        sprintId: 'sprint-17',
+        startDate: '2026-08-03',
+        endDate: '2026-08-14',
+        engineer: 'Otro empleado',
+        metrics: {},
+        finalScore: 80,
+        ratingLabel: 'Bueno',
+        evaluatorEmail: 'architect@example.com',
+      }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(dataService.saveEvaluation).not.toHaveBeenCalled();
   });

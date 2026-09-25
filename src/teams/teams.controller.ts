@@ -25,7 +25,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
-import type { SaveEvaluationRequest } from '../supabase/interfaces/supabase-interface';
+import { SaveSprintEvaluationDto } from './dto/save-sprint-evaluation.dto';
 
 @ApiTags('Equipos')
 @Controller('teams')
@@ -62,8 +62,12 @@ export class TeamsController {
   @ApiOperation({ summary: 'Obtener todos los equipos' })
   @ApiResponse({ status: 200, description: 'Listado de equipos' })
   @ApiResponse({ status: 404, description: 'No existen equipos' })
-  async findAll(@Query('onlyWithEvaluations') onlyWithEvaluations?: string) {
-    const data = await this.teamsService.findAll(
+  async findAll(
+    @Query('onlyWithEvaluations') onlyWithEvaluations: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const data = await this.teamsService.findAllForUser(
+      user,
       onlyWithEvaluations === 'true',
     );
 
@@ -84,8 +88,8 @@ export class TeamsController {
 
   @Get('overview')
   @ApiOperation({ summary: 'Obtener equipos y sus integrantes' })
-  async getOverview() {
-    return this.teamsService.getOverview();
+  async getOverview(@CurrentUser() user: AuthenticatedUser) {
+    return this.teamsService.getOverview(user);
   }
 
   @Get(':teamId/home-dashboard')
@@ -93,24 +97,13 @@ export class TeamsController {
     summary:
       'Obtener dashboard consolidado operativo y de rendimiento del Home',
   })
-  async getHomeDashboard(@Param('teamId') teamId: string) {
+  async getHomeDashboard(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     const data = await this.teamsService.getHomeDashboard(teamId);
     if (!data) throw new NotFoundException('Equipo no encontrado');
-    return data;
-  }
-
-  @Get(':teamId/dashboard')
-  @ApiOperation({
-    summary: 'Obtener datos consolidados para el dashboard del equipo',
-  })
-  @ApiParam({ name: 'equipoId', type: String, example: 'sgb-evolucion' })
-  @ApiResponse({ status: 200, description: 'Datos del dashboard' })
-  @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
-  async getDashboard(@Param('teamId') teamId: string) {
-    const data = await this.teamsService.getDashboardData(teamId);
-    if (!data) {
-      throw new NotFoundException('Equipo no encontrado');
-    }
     return data;
   }
 
@@ -124,7 +117,11 @@ export class TeamsController {
     description: 'Contexto consolidado del cuadro de sprints',
   })
   @ApiResponse({ status: 404, description: 'Equipo no encontrado' })
-  async getSprintBoardContext(@Param('teamId') teamId: string) {
+  async getSprintBoardContext(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     const context = await this.teamsService.getSprintBoardContext(teamId);
     if (!context) throw new NotFoundException('No existe el equipo');
     return context;
@@ -144,7 +141,11 @@ export class TeamsController {
     status: 404,
     description: 'No existen sprints para este equipo',
   })
-  async getSprintsByTeam(@Param('teamId') teamId: string) {
+  async getSprintsByTeam(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     if (!teamId) {
       throw new BadRequestException('equipoId es obligatorio');
     }
@@ -158,70 +159,10 @@ export class TeamsController {
   async getMembers(
     @Param('teamId') teamId: string,
     @Param('sprintId') sprintId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     return this.teamsService.getMembersBySprint(teamId, sprintId);
-  }
-
-  @Get(':teamId/sprints/:sprintId')
-  @ApiOperation({ summary: 'Obtener un sprint por equipo' })
-  @ApiParam({
-    name: 'equipoId',
-    type: String,
-    example: 'sgb-evolucion',
-    description: 'ID del equipo',
-  })
-  @ApiParam({
-    name: 'sprintId',
-    type: String,
-    example: 'sprint-1',
-    description: 'ID del sprint',
-  })
-  @ApiResponse({ status: 200, description: 'Datos del sprint' })
-  @ApiResponse({ status: 400, description: 'equipoId o sprintId inválido' })
-  @ApiResponse({
-    status: 404,
-    description: 'No existe el sprint para este equipo',
-  })
-  async getSprint(
-    @Param('teamId') teamId: string,
-    @Param('sprintId') sprintId: string,
-  ) {
-    if (!teamId || !sprintId) {
-      throw new BadRequestException('equipoId y sprintId son obligatorios');
-    }
-
-    const sprint = await this.teamsService.getSprint(teamId, sprintId);
-
-    if (!sprint) {
-      throw new NotFoundException('No existe el sprint para este equipo');
-    }
-
-    return sprint;
-  }
-
-  @Get(':teamId')
-  @ApiOperation({ summary: 'Obtener un equipo por ID' })
-  @ApiParam({
-    name: 'equipoId',
-    type: String,
-    example: 'sgb-evolucion',
-    description: 'ID del equipo',
-  })
-  @ApiResponse({ status: 200, description: 'Datos del equipo' })
-  @ApiResponse({ status: 400, description: 'equipoId inválido' })
-  @ApiResponse({ status: 404, description: 'No existe el equipo' })
-  async getTeam(@Param('teamId') teamId: string) {
-    if (!teamId) {
-      throw new BadRequestException('equipoId es obligatorio');
-    }
-
-    const team = await this.teamsService.getTeam(teamId);
-
-    if (!team) {
-      throw new NotFoundException('No existe el equipo');
-    }
-
-    return team;
   }
 
   @Get(':teamId/sprints/:sprintId/metrics')
@@ -232,7 +173,9 @@ export class TeamsController {
   async getMetricas(
     @Param('teamId') teamId: string,
     @Param('sprintId') sprintId: string,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     if (!teamId || !sprintId) {
       throw new BadRequestException('equipoId y sprintId son obligatorios');
     }
@@ -252,8 +195,10 @@ export class TeamsController {
   })
   async getEvaluationStatus(
     @Param('teamId') teamId: string,
-    @Query('sprintId') sprintId?: string,
+    @Query('sprintId') sprintId: string | undefined,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.teamsService.assertTeamAccess(teamId, user);
     return this.teamsService.getSprintEvaluationStatus(teamId, sprintId);
   }
 
@@ -266,9 +211,10 @@ export class TeamsController {
     description: 'Evaluación de sprint guardada exitosamente',
   })
   async saveSprintEvaluation(
-    @Body() body: Partial<SaveEvaluationRequest>,
+    @Body() body: SaveSprintEvaluationDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
+    await this.teamsService.assertTeamAccess(body.teamId, user);
     return this.teamsService.saveEvaluation({
       ...body,
       evaluatorEmail: user.email,
