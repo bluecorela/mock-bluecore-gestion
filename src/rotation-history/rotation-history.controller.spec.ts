@@ -5,6 +5,9 @@ import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 describe('RotationHistoryController authorization', () => {
   it('shows only rotations involving the authenticated team', async () => {
     const service = {
+      findTeamsForUser: jest
+        .fn()
+        .mockResolvedValue([{ id: 'team-a' }, { id: 'team-b' }]),
       findAll: jest.fn().mockResolvedValue([
         { id: 'own', fromTeam: 'team-a', toTeam: 'team-b' },
         { id: 'other', fromTeam: 'team-c', toTeam: 'team-d' },
@@ -24,6 +27,9 @@ describe('RotationHistoryController authorization', () => {
 
   it('includes rotations involving a secondary active team', async () => {
     const service = {
+      findTeamsForUser: jest
+        .fn()
+        .mockResolvedValue([{ id: 'team-a' }, { id: 'team-b' }]),
       findAll: jest.fn().mockResolvedValue([
         { id: 'secondary', fromTeam: 'team-c', toTeam: 'TEAM-B' },
         { id: 'other', fromTeam: 'team-c', toTeam: 'team-d' },

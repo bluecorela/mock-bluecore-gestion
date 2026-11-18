@@ -5,6 +5,12 @@ import { SupabaseDataService } from '../supabase/supabase-data.service';
 export class RotationHistoryService {
   constructor(private readonly supabaseDataService: SupabaseDataService) {}
 
+  findTeamsForUser(
+    user: import('../auth/interfaces/auth-user.interface').AuthenticatedUser,
+  ) {
+    return this.supabaseDataService.findLegacyTeamsForUser(user);
+  }
+
   async findAll() {
     const history = await this.supabaseDataService.getRotationHistory();
 

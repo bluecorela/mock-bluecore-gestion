@@ -32,9 +32,11 @@ export class RotationHistoryController {
   async findAll(@CurrentUser() user: AuthenticatedUser) {
     const data = await this.rotationHistoryService.findAll();
     const accessibleTeams = new Set(
-      [user.teamId, ...(user.teamIds ?? [])]
-        .filter((value): value is string => Boolean(value))
-        .map((value) => value.toLowerCase()),
+      user.role === 'Admin'
+        ? []
+        : (await this.rotationHistoryService.findTeamsForUser(user)).map(
+            (team) => team.id.toLowerCase(),
+          ),
     );
     const visible =
       user.role === 'Admin'

@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsIn,
 } from 'class-validator';
+import { AUTH_ROLES } from '../../auth/auth.constants';
 
 export class CreatePersonnelDto {
   @ApiProperty({
@@ -18,27 +19,11 @@ export class CreatePersonnelDto {
 
   @ApiProperty({
     description: 'Rol del miembro',
-    enum: [
-      'Admin',
-      'Arquitecto',
-      'Scrum Master',
-      'Ingeniero de Software',
-      'Ingeniero de QA',
-      'Creador de Bienestar',
-      'Pasante',
-    ],
+    enum: [...AUTH_ROLES],
     example: 'Ingeniero de Software',
   })
   @IsNotEmpty({ message: 'El rol es obligatorio' })
-  @IsIn([
-    'Admin',
-    'Arquitecto',
-    'Scrum Master',
-    'Ingeniero de Software',
-    'Ingeniero de QA',
-    'Creador de Bienestar',
-    'Pasante',
-  ])
+  @IsIn([...AUTH_ROLES])
   role: string;
 
   @ApiProperty({

@@ -16,6 +16,7 @@ export interface Team {
 
 export interface Personnel {
   id: string;
+  employeeId?: string;
   name: string | null;
   role: string | null;
   email: string | null;
@@ -28,6 +29,12 @@ export interface Personnel {
   teams?: Array<{ id: string; path: string; referencePath: string }>;
 }
 
+export type OperationalSprintStatus =
+  | 'planned'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
 export interface Sprint {
   id: string;
   code: string;
@@ -35,6 +42,7 @@ export interface Sprint {
   start_date: string | null;
   end_date: string | null;
   sprint_closed: boolean | null;
+  status: OperationalSprintStatus;
 }
 
 export interface SprintMember {
@@ -83,7 +91,11 @@ export interface DashboardSprint {
   members: DashboardMember[];
 }
 
-export type SprintStatus = 'Completado' | 'En proceso';
+export type SprintStatus =
+  | 'Planificado'
+  | 'En curso'
+  | 'Completado'
+  | 'Cancelado';
 
 export interface DashboardSprintWithStatus extends DashboardSprint {
   status: SprintStatus;
@@ -97,7 +109,7 @@ export interface BarChartData {
 export interface PerformanceSummary {
   sprintId: string;
   average: number;
-  status: SprintStatus;
+  status: 'Completado' | 'En proceso';
   rating: string;
   totalEvaluated: number;
 }

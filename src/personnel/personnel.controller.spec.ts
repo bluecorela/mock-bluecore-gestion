@@ -12,7 +12,7 @@ describe('PersonnelController', () => {
     const dto = {
       name: 'Ana Pérez',
       email: 'ana@bluecorela.com',
-      role: 'Pasante',
+      role: 'Ingeniero de QA',
       teamId: 'gb-web',
     };
     const user = { supabaseUserId: 'auth-user-id' } as AuthenticatedUser;
@@ -25,6 +25,7 @@ describe('PersonnelController', () => {
 
   it('allows a user to list personnel from any active team', async () => {
     const personnelService = {
+      assertTeamAccess: jest.fn().mockResolvedValue(undefined),
       findByTeam: jest.fn().mockResolvedValue([{ id: 'employee-id' }]),
     } as unknown as PersonnelService;
     const controller = new PersonnelController(personnelService);
@@ -42,6 +43,7 @@ describe('PersonnelController', () => {
 
   it('rejects personnel queries for teams outside the active memberships', async () => {
     const personnelService = {
+      assertTeamAccess: jest.fn().mockRejectedValue(new ForbiddenException()),
       findByTeam: jest.fn(),
     } as unknown as PersonnelService;
     const controller = new PersonnelController(personnelService);

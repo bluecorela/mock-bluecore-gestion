@@ -6,13 +6,14 @@ import {
   BarChartData,
   Team,
   DashboardMember,
-  DashboardSprint,
+  DashboardSprintWithStatus,
   TeamDashboardData,
   TeamSprintResponse,
   SaveEvaluationRequest,
   CurrentEngineer,
   MemberSummary,
   SprintStatus,
+  OperationalSprintStatus,
 } from '../supabase/interfaces/supabase-interface';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 import { SaveSprintEvaluationDto } from './dto/save-sprint-evaluation.dto';
@@ -74,11 +75,7 @@ export class TeamsService {
     if (!team) return null;
 
     const personnel = await this.supabaseDataService.getEmployeeByTeam(teamId);
-    const allowedRoles = [
-      'Ingeniero de Software',
-      'Ingeniero de QA',
-      'Ingeniero QA',
-    ];
+    const allowedRoles = ['Ingeniero de Software', 'Ingeniero de QA'];
     const currentEngineers: CurrentEngineer[] = personnel
       .filter((p) =>
         allowedRoles.some((role) =>
@@ -95,7 +92,13 @@ export class TeamsService {
     const historyData = await this.supabaseDataService.getRotationHistory();
     const rawSprints = await this.supabaseDataService.getSprintsByTeam(teamId);
 
-    const sprints: DashboardSprint[] = await Promise.all(
+    const statusLabels: Record<OperationalSprintStatus, SprintStatus> = {
+      planned: 'Planificado',
+      in_progress: 'En curso',
+      completed: 'Completado',
+      cancelled: 'Cancelado',
+    };
+    const sprints: DashboardSprintWithStatus[] = await Promise.all(
       rawSprints.map(async (s) => {
         const members = await this.supabaseDataService.getMembersBySprint(
           teamId,
@@ -103,6 +106,7 @@ export class TeamsService {
         );
         return {
           id: s.code,
+          status: statusLabels[s.status],
           startDate: s.start_date ?? null,
           endDate: s.end_date ?? null,
           sprintClosed: s.sprint_closed ?? null,
@@ -128,32 +132,7 @@ export class TeamsService {
       return dateB - dateA;
     });
 
-    const dashboardSprints = sortedSprints.map((s, index) => {
-      let status: SprintStatus = 'En proceso';
-      if (index > 0) {
-        status = 'Completado';
-      } else {
-        const evaluatedMembers = s.members.filter((i) => {
-          if (i.rating === 'Arquitecto') return false;
-          const persona = currentEngineers.find((p) => p.name === i.name);
-          if (!persona) return false;
-          if (persona.onVacation) return false;
-          return true;
-        });
-
-        const validEngineers = currentEngineers.filter((p) => !p.onVacation);
-        status =
-          evaluatedMembers.length >= validEngineers.length &&
-          validEngineers.length > 0
-            ? 'Completado'
-            : 'En proceso';
-      }
-
-      return {
-        ...s,
-        status,
-      };
-    });
+    const dashboardSprints = sortedSprints;
     const lastPerformance =
       this.operacionesService.calculateLastClosedSprintPerformance(
         sprints,
@@ -197,8 +176,7 @@ export class TeamsService {
       },
       stats: {
         totalMembers: personnel.length,
-        totalSprints: dashboardSprints.filter((s) => s.status === 'Completado')
-          .length,
+        totalSprints: rawSprints.filter((s) => s.status === 'completed').length,
         averagePerformance: lastPerformance?.average ?? 0,
         ratedPerformance: lastPerformance?.rating ?? 'Sin datos',
       },
@@ -220,7 +198,7 @@ export class TeamsService {
     } catch (error) {
       console.warn('Operational sprints unavailable for Home:', error);
     }
-    const today = new Date().toISOString().slice(0, 10);
+    const today = this.sprintsService.today();
     const sprintForToday = sprints.find(
       (s) =>
         s.startDate <= today &&
@@ -250,6 +228,15 @@ export class TeamsService {
       }
     }
 
+    let initiatives: Awaited<
+      ReturnType<SprintsService['findHomeInitiatives']>
+    > | null = null;
+    try {
+      initiatives = await this.sprintsService.findHomeInitiatives(teamId);
+    } catch (error) {
+      console.warn('Team initiatives unavailable for Home:', error);
+    }
+
     return {
       team: { id: team.id, name: team.name },
       stats: legacyDashboard?.stats ?? null,
@@ -257,6 +244,7 @@ export class TeamsService {
       charts: legacyDashboard?.charts ?? null,
       currentSprint,
       sprintDashboard,
+      initiatives,
       recentSprints: sprints.slice(0, 5),
       performance: legacyDashboard?.stats ?? null,
       performanceCharts: legacyDashboard?.charts ?? null,
@@ -271,21 +259,10 @@ export class TeamsService {
     user: AuthenticatedUser,
     onlyWithEvaluations = false,
   ): Promise<Team[]> {
-    const teams = await this.findAll(onlyWithEvaluations);
-    if (user.role === 'Admin') return teams;
-    if (!user.personnelId) return [];
-
-    const access = await Promise.all(
-      teams.map(async (team) => ({
-        team,
-        members: await this.supabaseDataService.getEmployeeByTeam(team.id),
-      })),
+    return this.supabaseDataService.findLegacyTeamsForUser(
+      user,
+      onlyWithEvaluations,
     );
-    return access
-      .filter(({ members }) =>
-        members.some((member) => member.id === user.personnelId),
-      )
-      .map(({ team }) => team);
   }
 
   async getSprintsByTeam(teamId: string): Promise<TeamSprintResponse[]> {

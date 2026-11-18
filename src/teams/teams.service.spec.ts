@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { SprintsService } from '../sprints/services/sprints.service';
 import { TeamsService } from './teams.service';
 import { OperationsService } from '../operations/operations.service';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
@@ -14,45 +15,194 @@ describe('TeamsService', () => {
     saveEvaluation: jest.fn(),
     getTeam: jest.fn(),
     getEmployeeByTeam: jest.fn(),
+    findLegacyTeamsForUser: jest.fn(),
     getSprintsByTeam: jest.fn(),
     getRotationHistory: jest.fn(),
     getSprintEvaluationStatus: jest.fn(),
     getSprint: jest.fn(),
     getTeams: jest.fn(),
+    getMembersBySprint: jest.fn(),
   } as unknown as SupabaseDataService;
-  const service = new TeamsService(operationsService, dataService);
+  const sprintsService = {
+    today: jest.fn().mockReturnValue('2026-11-11'),
+    findByTeam: jest.fn().mockResolvedValue([]),
+    dashboard: jest.fn(),
+    findHomeInitiatives: jest.fn(),
+  };
+  const service = new TeamsService(
+    operationsService,
+    dataService,
+    sprintsService as unknown as SprintsService,
+  );
 
   beforeEach(() => jest.clearAllMocks());
 
+  describe('getDashboardData operational status', () => {
+    beforeEach(() => {
+      jest
+        .spyOn(dataService, 'getTeam')
+        .mockResolvedValue({ id: 'team', name: 'Team' });
+      jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([]);
+      jest.spyOn(dataService, 'getRotationHistory').mockResolvedValue([]);
+      operationsService.calculateLastClosedSprintPerformance = jest
+        .fn()
+        .mockReturnValue(null);
+      operationsService.calculateSprintPerformance = jest
+        .fn()
+        .mockReturnValue(null);
+    });
+    it.each([false, true])(
+      'uses operational states regardless of evaluations (evaluated=%s)',
+      async (evaluated) => {
+        jest
+          .spyOn(dataService, 'getTeam')
+          .mockResolvedValue({ id: 'team', name: 'Team' });
+        jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([
+          {
+            id: 'engineer',
+            name: 'Ana',
+            role: 'Ingeniero de Software',
+            onVacation: false,
+          } as Personnel,
+        ]);
+        jest.spyOn(dataService, 'getRotationHistory').mockResolvedValue([]);
+        const states = [
+          'planned',
+          'in_progress',
+          'cancelled',
+          'completed',
+          'completed',
+        ] as const;
+        jest.spyOn(dataService, 'getSprintsByTeam').mockResolvedValue(
+          states.map((status, index) => ({
+            id: `id-${index}`,
+            code: `sprint-${index}`,
+            team_id: 'team',
+            start_date: `2026-11-${20 - index}`,
+            end_date: null,
+            sprint_closed: false,
+            status,
+          })),
+        );
+        jest.spyOn(dataService, 'getMembersBySprint').mockResolvedValue(
+          evaluated
+            ? [
+                {
+                  id: 'engineer',
+                  name: 'Ana',
+                  rating: 'Bueno',
+                  total_final: 80,
+                } as never,
+              ]
+            : [],
+        );
+        operationsService.calculateLastClosedSprintPerformance = jest
+          .fn()
+          .mockReturnValue(null);
+        operationsService.calculateSprintPerformance = jest
+          .fn()
+          .mockReturnValue(null);
+
+        const dashboard = await service.getDashboardData('team');
+
+        expect(
+          dashboard?.sprints.map(({ id, status }) => ({ id, status })),
+        ).toEqual([
+          { id: 'sprint-0', status: 'Planificado' },
+          { id: 'sprint-1', status: 'En curso' },
+          { id: 'sprint-2', status: 'Cancelado' },
+          { id: 'sprint-3', status: 'Completado' },
+          { id: 'sprint-4', status: 'Completado' },
+        ]);
+        expect(dashboard?.stats.totalSprints).toBe(2);
+      },
+    );
+
+    it('returns zero completed sprints for an empty team', async () => {
+      jest.spyOn(dataService, 'getSprintsByTeam').mockResolvedValue([]);
+      const dashboard = await service.getDashboardData('team');
+      expect(dashboard?.sprints).toEqual([]);
+      expect(dashboard?.stats.totalSprints).toBe(0);
+    });
+  });
+
+  describe('getHomeDashboard', () => {
+    beforeEach(() => {
+      sprintsService.today.mockReturnValue('2026-11-11');
+      jest
+        .spyOn(service, 'getTeam')
+        .mockResolvedValue({ id: 'team-a', name: 'Team A' } as never);
+      jest.spyOn(service, 'getDashboardData').mockResolvedValue(null as never);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it.each([
+      ['2026-11-11', 'in-progress'],
+      ['2026-11-12', 'planned'],
+    ])('selecciona el sprint actual con fecha local %s', async (today, id) => {
+      jest.useFakeTimers().setSystemTime(new Date('2026-11-12T02:00:00Z'));
+      sprintsService.today.mockReturnValue(today);
+      sprintsService.findByTeam.mockResolvedValueOnce([
+        {
+          id: 'in-progress',
+          status: 'in_progress',
+          startDate: '2026-10-29',
+          endDate: '2026-11-11',
+        },
+        {
+          id: 'planned',
+          status: 'planned',
+          startDate: '2026-11-12',
+          endDate: '2026-11-25',
+        },
+      ]);
+
+      try {
+        const result = await service.getHomeDashboard('team-a');
+        expect(result?.currentSprint?.id).toBe(id);
+        expect(sprintsService.today).toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('incluye las iniciativas del equipo', async () => {
+      const initiatives = { active: [{ id: 'initiative' }], finished: [] };
+      sprintsService.findHomeInitiatives.mockResolvedValue(initiatives);
+      expect(await service.getHomeDashboard('team-a')).toMatchObject({
+        initiatives,
+      });
+      expect(sprintsService.findHomeInitiatives).toHaveBeenCalledWith('team-a');
+    });
+
+    it('devuelve initiatives null si falla la consulta', async () => {
+      const error = new Error('fallo');
+      const warn = jest
+        .spyOn(console, 'warn')
+        .mockImplementation(() => undefined);
+      sprintsService.findHomeInitiatives.mockRejectedValue(error);
+      expect(await service.getHomeDashboard('team-a')).toMatchObject({
+        team: { id: 'team-a' },
+        initiatives: null,
+      });
+      expect(warn).toHaveBeenCalledWith(
+        'Team initiatives unavailable for Home:',
+        error,
+      );
+    });
+  });
+
   it('returns every active team membership for a non-admin user', async () => {
-    jest.spyOn(dataService, 'getTeams').mockResolvedValue([
+    jest.spyOn(dataService, 'findLegacyTeamsForUser').mockResolvedValue([
       { id: 'team-a', name: 'Team A' },
       { id: 'team-b', name: 'Team B' },
-      { id: 'team-c', name: 'Team C' },
     ]);
-    jest
-      .spyOn(dataService, 'getEmployeeByTeam')
-      .mockImplementation(async (teamId: string) =>
-        teamId === 'team-c'
-          ? []
-          : [
-              {
-                id: 'employee-id',
-                name: 'Example Employee',
-                email: null,
-                role: null,
-                teamId,
-                status: 'activo',
-                onVacation: false,
-                replacementStartSprintId: null,
-              },
-            ],
-      );
 
     await expect(
       service.findAllForUser({
         role: 'Arquitecto',
         personnelId: 'employee-id',
+        employeeId: 'employee-id',
       } as never),
     ).resolves.toEqual([
       { id: 'team-a', name: 'Team A' },
@@ -93,6 +243,7 @@ describe('TeamsService', () => {
       start_date: '2026-08-03',
       end_date: '2026-08-14',
       sprint_closed: false,
+      status: 'in_progress',
     });
     jest.spyOn(dataService, 'getEmployeeByTeam').mockResolvedValue([
       {
@@ -166,6 +317,7 @@ describe('TeamsService', () => {
         start_date: '2026-08-03',
         end_date: '2026-08-14',
         sprint_closed: false,
+        status: 'in_progress',
       } satisfies Sprint,
     ]);
     jest.spyOn(dataService, 'getRotationHistory').mockResolvedValue([

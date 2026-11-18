@@ -106,17 +106,7 @@ export class PersonnelController {
     if (!teamId) {
       throw new BadRequestException('El parámetro "equipoId" es obligatorio');
     }
-    const accessibleTeams = new Set(
-      [user.teamId, ...(user.teamIds ?? [])]
-        .filter((value): value is string => Boolean(value))
-        .map((value) => value.toLowerCase()),
-    );
-    if (
-      user.role !== 'Admin' &&
-      !accessibleTeams.has(teamId.toLowerCase())
-    ) {
-      throw new ForbiddenException('No tiene acceso a este equipo');
-    }
+    await this.personnelService.assertTeamAccess(teamId, user);
     const personnel = await this.personnelService.findByTeam(teamId);
     return personnel || [];
   }
