@@ -1,7 +1,9 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { HealthService } from './health.service';
+import { PublicRoute } from '../auth/access.decorators';
 
+@PublicRoute()
 @ApiTags('Health')
 @Controller('health')
 export class HealthController {

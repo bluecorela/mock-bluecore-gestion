@@ -2,11 +2,11 @@ import {
   Body,
   Controller,
   Get,
-  Headers,
   NotFoundException,
   Param,
   Patch,
   Post,
+  ServiceUnavailableException,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -15,6 +15,7 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
@@ -25,13 +26,50 @@ import { UpdateAuthUserDto } from './dto/update-auth-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
+import { AnyAuthenticatedRole, PublicRoute } from './access.decorators';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  @Get('client-config')
+  @PublicRoute()
+  @ApiOperation({
+    summary: 'Obtener configuración pública del cliente Supabase',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Configuración pública del cliente',
+    schema: {
+      type: 'object',
+      required: ['supabaseUrl', 'anonKey'],
+      properties: {
+        supabaseUrl: { type: 'string' },
+        anonKey: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Configuración de cliente no disponible',
+  })
+  clientConfig(): { supabaseUrl: string; anonKey: string } {
+    const supabaseUrl = this.configService.get<string>('SUPABASE_URL')?.trim();
+    const anonKey = this.configService.get<string>('SUPABASE_ANON_KEY')?.trim();
+    if (!supabaseUrl || !anonKey) {
+      throw new ServiceUnavailableException(
+        'Configuración de cliente no disponible',
+      );
+    }
+    return { supabaseUrl, anonKey };
+  }
 
   @Post('login')
+  @PublicRoute()
   @Throttle({ default: { limit: 8, ttl: 60_000 } })
   @ApiOperation({
     summary:
@@ -48,12 +86,13 @@ export class AuthController {
   }
 
   @Get('validate')
+  @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Validar access token de Supabase' })
   @ApiResponse({ status: 200, description: 'Token válido' })
   @ApiResponse({ status: 401, description: 'Token inválido o ausente' })
-  async validate(@Headers('authorization') authorization?: string) {
-    return this.authService.validateAuthorizationHeader(authorization);
+  validate(@CurrentUser() user: AuthenticatedUser) {
+    return user;
   }
 
   @Get('me')
@@ -67,6 +106,7 @@ export class AuthController {
   }
 
   @Get('bootstrap')
+  @AnyAuthenticatedRole()
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
   @ApiOperation({

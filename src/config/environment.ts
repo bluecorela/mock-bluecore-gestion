@@ -57,6 +57,19 @@ export function validateEnvironment(
     }
   }
 
+  const confirmationSecret = String(
+    config.LOAD_CONFIRMATION_SECRET ?? '',
+  ).trim();
+  if (
+    (environment === 'production' || confirmationSecret.length > 0) &&
+    confirmationSecret.length < 32
+  ) {
+    throw new Error(
+      'LOAD_CONFIRMATION_SECRET must have at least 32 characters',
+    );
+  }
+  config.LOAD_CONFIRMATION_SECRET = confirmationSecret;
+
   if (
     config.AUTH_EMAIL_PROVIDER === 'supabase' &&
     !String(config.SUPABASE_ANON_KEY ?? '').trim()
@@ -65,6 +78,24 @@ export function validateEnvironment(
       'SUPABASE_ANON_KEY is required when AUTH_EMAIL_PROVIDER=supabase',
     );
   }
+
+  const publicApiUrl = String(config.PUBLIC_API_URL ?? '').trim();
+  if (!publicApiUrl && environment === 'production') {
+    throw new Error('PUBLIC_API_URL is required in production');
+  }
+  if (!publicApiUrl && environment === 'development') {
+    console.warn(
+      `PUBLIC_API_URL no está definida: se usa http://localhost:${port}. Los clientes MCP rechazarán la conexión si la API no corre en local.`,
+    );
+  }
+  config.PUBLIC_API_URL = publicApiUrl || `http://localhost:${port}`;
+  try {
+    const url = new URL(String(config.PUBLIC_API_URL));
+    if (!['http:', 'https:'].includes(url.protocol)) throw new Error();
+  } catch {
+    throw new Error('PUBLIC_API_URL must be a valid URL');
+  }
+  config.PUBLIC_API_URL = String(config.PUBLIC_API_URL).replace(/\/+$/, '');
 
   return config;
 }
