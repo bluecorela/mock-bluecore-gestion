@@ -1,7 +1,9 @@
 import {
   Body,
+  Delete,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -22,7 +24,11 @@ import type { AuthenticatedUser } from '../../auth/interfaces/auth-user.interfac
 import { Roles } from '../../auth/roles.decorator';
 import { RolesGuard } from '../../auth/roles.guard';
 import { OrganizationService } from '../../organization/services/organization.service';
-import { CreateSprintDto, UpdateSprintDto } from '../dto/sprint.dto';
+import {
+  CreateSprintDto,
+  PreviewSprintDto,
+  UpdateSprintDto,
+} from '../dto/sprint.dto';
 import {
   SprintInitialContextQueryDto,
   SprintListQueryDto,
@@ -72,6 +78,22 @@ export class SprintsController {
     return this.service.initialContext(teamId, query.today);
   }
 
+  @Post('preview')
+  @HttpCode(200)
+  @UseGuards(RolesGuard)
+  @Roles('Admin', 'Arquitecto')
+  @ApiOperation({ summary: 'Vista previa de un sprint con historias' })
+  async preview(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Body() input: PreviewSprintDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+    ]);
+    return this.service.preview(teamId, input, user);
+  }
+
   @Get(':sprintId/dashboard')
   @ApiOperation({ summary: 'Get the operational dashboard for a sprint' })
   @ApiParam({ name: 'sprintId', format: 'uuid' })
@@ -107,8 +129,27 @@ export class SprintsController {
     @Body() input: CreateSprintDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
-    return this.service.create(teamId, input);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+    ]);
+    return this.service.create(teamId, input, user);
+  }
+
+  @Delete(':sprintId')
+  @HttpCode(204)
+  @Roles('Admin', 'Arquitecto')
+  @ApiOperation({
+    summary: 'Eliminar un sprint planificado sin historias ni dependencias',
+  })
+  async remove(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Param('sprintId', new ParseUUIDPipe()) sprintId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+    ]);
+    await this.service.remove(teamId, sprintId);
   }
 
   @Patch(':sprintId')
@@ -121,7 +162,10 @@ export class SprintsController {
     @Body() input: UpdateSprintDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     return this.service.update(teamId, sprintId, input);
   }
 
@@ -134,7 +178,9 @@ export class SprintsController {
     @Param('sprintId', new ParseUUIDPipe()) sprintId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+    ]);
     return this.service.start(teamId, sprintId);
   }
 
@@ -147,7 +193,9 @@ export class SprintsController {
     @Param('sprintId', new ParseUUIDPipe()) sprintId: string,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+    ]);
     return this.service.complete(teamId, sprintId);
   }
 }

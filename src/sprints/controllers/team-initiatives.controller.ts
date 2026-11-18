@@ -61,7 +61,10 @@ export class TeamInitiativesController {
     @Body() input: UpdateSprintInitiativeDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     return this.service.updateTeamInitiative(teamId, initiativeId, input);
   }
 }
