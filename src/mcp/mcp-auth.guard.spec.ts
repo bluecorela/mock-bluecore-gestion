@@ -127,6 +127,7 @@ describe('McpAuthGuard', () => {
   });
   it('limpia los vencidos a lo sumo una vez cada 60 s en las peticiones', async () => {
     const now = Date.now();
+    guard['lastFailureCleanup'] = now;
     jest.spyOn(Date, 'now').mockReturnValue(now);
     const cleanup = jest.spyOn(guard['failures'], Symbol.iterator);
     for (const elapsed of [0, 59_999, 60_000, 60_001, 120_000]) {
