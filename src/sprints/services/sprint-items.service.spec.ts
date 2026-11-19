@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { SprintItemsService } from './sprint-items.service';
 import { SprintItemsRepository } from '../repositories/sprint-items.repository';
 import { SprintsRepository } from '../repositories/sprints.repository';
@@ -5,6 +6,7 @@ import { SprintsRepository } from '../repositories/sprints.repository';
 describe('SprintItemsService', () => {
   const itemsRepository = {
     update: jest.fn(),
+    findAll: jest.fn(),
     createInitiative: jest.fn(),
     updateInitiative: jest.fn(),
   };
@@ -26,6 +28,58 @@ describe('SprintItemsService', () => {
       itemsRepository as unknown as SprintItemsRepository,
       sprintsRepository as unknown as SprintsRepository,
     );
+  });
+
+  it('rechaza modificar un sprint completado', async () => {
+    sprintsRepository.findById.mockResolvedValue({ status: 'completed' });
+    await expect(
+      service.update('team-id', 'sprint-id', 'item-id', 'stories', {
+        name: 'HU',
+      }),
+    ).rejects.toThrow('No se puede modificar un sprint completado');
+  });
+
+  it('rechaza cambiar el código de una HU sin escribir en el repositorio', async () => {
+    itemsRepository.findAll.mockResolvedValue([
+      { id: 'item-id', code: ' hu-1 ', status: 'pending' },
+    ]);
+
+    const request = service.update(
+      'team-id',
+      'sprint-id',
+      'item-id',
+      'stories',
+      {
+        code: ' HU-2 ',
+      },
+    );
+
+    await expect(request).rejects.toBeInstanceOf(BadRequestException);
+    await expect(request).rejects.toThrow(
+      'El código de una HU no se puede cambiar',
+    );
+    expect(itemsRepository.update).not.toHaveBeenCalled();
+  });
+
+  it('actualiza una HU con código equivalente sin incluir code en el payload', async () => {
+    itemsRepository.findAll.mockResolvedValue([
+      { id: 'item-id', code: 'HU-1', status: 'pending' },
+    ]);
+
+    await expect(
+      service.update('team-id', 'sprint-id', 'item-id', 'stories', {
+        code: ' hu-1 ',
+        name: 'Nombre actualizado',
+      }),
+    ).resolves.toEqual({ id: 'item-id' });
+
+    expect(itemsRepository.update).toHaveBeenCalledWith(
+      'sprint_user_stories',
+      'sprint-id',
+      'item-id',
+      { name: 'Nombre actualizado' },
+    );
+    expect(itemsRepository.update.mock.calls[0][3]).not.toHaveProperty('code');
   });
 
   it('clears resolved_at when reopening a bug', async () => {

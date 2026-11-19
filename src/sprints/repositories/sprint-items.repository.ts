@@ -1,3 +1,5 @@
+import { sprintExceptionFromSupabase } from '../sprint-error-codes';
+import { sprintErrorMessage } from '../sprint-error-message';
 import {
   BadRequestException,
   ConflictException,
@@ -5,7 +7,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { SupabaseClient } from '../../supabase/supabase.client';
-import { mapSprintItem } from '../mappers/sprint-item.mapper';
+import { mapSprintBug, mapSprintItem } from '../mappers/sprint-item.mapper';
 
 export type SprintItemTable =
   | 'sprint_initiatives'
@@ -32,11 +34,17 @@ export class SprintItemsRepository {
     const { data, error } = await this.supabaseClient
       .getV2Client()
       .from(table)
-      .select('*')
+      .select(
+        table === 'sprint_bugs'
+          ? '*,story:sprint_user_stories!sprint_bugs_story_id_fkey(code,name)'
+          : '*',
+      )
       .eq('sprint_id', sprintId)
       .order('created_at');
     if (error) this.fail(table, error);
-    return (data ?? []).map((row) => mapSprintItem(row));
+    return (data ?? []).map((row) =>
+      table === 'sprint_bugs' ? mapSprintBug(row) : mapSprintItem(row),
+    );
   }
 
   async countBySprint(table: SprintItemTable, sprintId: string) {
@@ -119,6 +127,11 @@ export class SprintItemsRepository {
       .delete({ count: 'exact' })
       .eq('id', itemId)
       .eq('sprint_id', sprintId);
+    if (error?.code === '23503' && table === 'sprint_user_stories') {
+      throw new BadRequestException(
+        'No se puede eliminar la HU porque tiene bugs asociados',
+      );
+    }
     if (error) this.fail(table, error);
     return count === 1;
   }
@@ -144,16 +157,23 @@ export class SprintItemsRepository {
 
   private fail(
     resource: string,
-    error: { code?: string; message?: string },
+    error: { code?: string; details?: string; message?: string },
   ): never {
+    const codedError = sprintExceptionFromSupabase(error);
+    if (codedError) throw codedError;
+    // Respaldo eliminable cuando la nube tenga la migración 20261118.
     if (error.code === '23505') {
-      throw new ConflictException(`Conflict while saving ${resource}`);
+      throw new ConflictException(
+        ['sprint_user_stories', 'sprint user story'].includes(resource)
+          ? 'El código de la HU ya existe en otro sprint; vuelve a intentarlo'
+          : `Conflict while saving ${resource}`,
+      );
     }
     if (['23503', '23514', 'P0001'].includes(error.code ?? '')) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(sprintErrorMessage(error.message));
     }
     throw new InternalServerErrorException(
-      `Could not access ${resource}: ${error.message || 'unknown error'}`,
+      `Could not access ${resource}: ${sprintErrorMessage(error.message) || 'unknown error'}`,
     );
   }
 }

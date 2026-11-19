@@ -12,7 +12,10 @@ export class HealthService {
       .select('id')
       .limit(1);
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Database health check timed out')), 3000),
+      setTimeout(
+        () => reject(new Error('Database health check timed out')),
+        3000,
+      ),
     );
 
     try {

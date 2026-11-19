@@ -143,7 +143,10 @@ export class SprintItemsController {
     @Body() body: MoveSprintUserStoryDto,
     @CurrentUser() user: AuthenticatedUser,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     return this.service.moveStory(
       teamId,
       sourceSprintId,
@@ -262,7 +265,10 @@ export class SprintItemsController {
     kind: Kind,
     body: CreateSprintItemDto,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     return this.service.create(teamId, sprintId, kind, body);
   }
   private async update(
@@ -273,7 +279,10 @@ export class SprintItemsController {
     kind: Kind,
     body: UpdateSprintItemDto,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     return this.service.update(teamId, sprintId, itemId, kind, body);
   }
   private async remove(
@@ -283,7 +292,10 @@ export class SprintItemsController {
     user: AuthenticatedUser,
     kind: Kind,
   ) {
-    await this.organizationService.assertTeamAccess(teamId, user);
+    await this.organizationService.assertTeamLeader(teamId, user, [
+      'ARCHITECT',
+      'SCRUM_MASTER',
+    ]);
     await this.service.remove(teamId, sprintId, itemId, kind);
   }
 }

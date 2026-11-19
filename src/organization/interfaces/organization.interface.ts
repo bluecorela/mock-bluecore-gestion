@@ -73,7 +73,28 @@ export interface TeamProjectMember {
   role: Role;
 }
 
+export interface TeamLeaders {
+  architect: EmployeeSummary | null;
+  scrumMaster: EmployeeSummary | null;
+}
+
+export interface TeamLeaderOverview extends TeamLeaders {
+  team: Pick<Team, 'id' | 'code' | 'name'>;
+}
+
+export interface LeaderCandidates {
+  architects: EmployeeSummary[];
+  scrumMasters: EmployeeSummary[];
+}
+
+export interface ReplaceTeamLeaderResult {
+  endedMemberships: number;
+  createdMemberships: number;
+  updatedPlannedSprints: number;
+}
+
 export interface TeamOrganization {
+  leaders: TeamLeaders;
   team: Team;
   assignments: TeamProject[];
 }

@@ -33,9 +33,6 @@ export class NavigationRepository {
       'Scrum Master': 'SCRUM_MASTER',
       'Ingeniero de Software': 'SOFTWARE_ENGINEER',
       'Ingeniero de QA': 'QA_ENGINEER',
-      'Ingeniero QA': 'QA_ENGINEER',
-      'Creador de Bienestar': 'WELLBEING_CREATOR',
-      Pasante: 'INTERN',
     };
     const roleCode = roleCodes[role] ?? role.toUpperCase();
     const { data: roleRecord, error: roleError } = await database

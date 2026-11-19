@@ -9,6 +9,7 @@ describe('WeeklyDashboardController authorization', () => {
   const user = {
     role: 'Scrum Master',
     personnelId: 'employee-id',
+    employeeId: 'employee-id',
   } as AuthenticatedUser;
   const service = {
     findReports: jest.fn(),

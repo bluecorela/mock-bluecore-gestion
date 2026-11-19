@@ -1,3 +1,4 @@
+import { sprintErrorException } from '../sprint-error-codes';
 import {
   BadRequestException,
   Injectable,
@@ -108,6 +109,19 @@ export class SprintItemsService {
         sprintId,
       );
       const current = currentItems.find((item) => item.id === itemId);
+      const code = (input as UpdateSprintUserStoryDto).code;
+      if (current && code !== undefined) {
+        if (
+          code.trim().toUpperCase() !==
+          (current.code ?? '').trim().toUpperCase()
+        ) {
+          throw new BadRequestException(
+            'El código de una HU no se puede cambiar',
+          );
+        }
+        input = { ...input };
+        delete (input as UpdateSprintUserStoryDto).code;
+      }
       if (current?.status === 'completed') {
         throw new BadRequestException(
           'No se puede actualizar una HU finalizada',
@@ -184,28 +198,30 @@ export class SprintItemsService {
     const source = await this.requireSprint(teamId, sourceSprintId);
     const target = await this.requireSprint(teamId, targetSprintId);
     if (source.id === target.id)
-      throw new BadRequestException('La historia ya pertenece a este sprint');
+      throw sprintErrorException(
+        'SAME_SOURCE_TARGET',
+        'La historia ya pertenece a este sprint',
+      );
     const story = await this.repository.moveStory(
       teamId,
       sourceSprintId,
       storyId,
       targetSprintId,
     );
-    if (!story)
-      throw new NotFoundException('Historia de usuario no encontrada');
+    if (!story) throw sprintErrorException('STORY_NOT_FOUND');
     return story;
   }
 
   private async requireSprint(teamId: string, sprintId: string) {
     const sprint = await this.sprintRepository.findById(teamId, sprintId);
-    if (!sprint) throw new NotFoundException('Sprint not found');
+    if (!sprint) throw sprintErrorException('SPRINT_NOT_FOUND');
     return sprint;
   }
 
   private async requireWritableSprint(teamId: string, sprintId: string) {
     const sprint = await this.requireSprint(teamId, sprintId);
     if (sprint.status === 'completed' || sprint.status === 'cancelled')
-      throw new BadRequestException('No se puede modificar un sprint cerrado');
+      throw sprintErrorException('SPRINT_COMPLETED');
     return sprint;
   }
 

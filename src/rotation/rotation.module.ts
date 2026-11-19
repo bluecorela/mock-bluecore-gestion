@@ -8,5 +8,6 @@ import { AuthModule } from '../auth/auth.module';
   imports: [SupabaseModule, AuthModule],
   controllers: [RotationController],
   providers: [RotationService],
+  exports: [RotationService],
 })
 export class RotationModule {}

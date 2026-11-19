@@ -1,10 +1,14 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { SupabaseClient } from '../../supabase/supabase.client';
 import {
+  TeamLeaders,
+  LeaderCandidates,
+  ReplaceTeamLeaderResult,
   Client,
   Project,
   SaveClientData,
@@ -31,6 +35,11 @@ interface EmployeeRow {
   employee_code: string | null;
   full_name: string;
   email: string;
+}
+
+interface LeaderEmployeeRow {
+  employees: EmployeeRow;
+  roles: { code: string };
 }
 
 interface RoleRow {
@@ -205,6 +214,7 @@ export class OrganizationRepository {
 
   async findTeamsForEmployee(employeeId: string): Promise<Team[]> {
     const database = this.supabaseClient.getV2Client();
+    const today = new Date().toISOString().slice(0, 10);
     const resolvedEmployeeId = await this.resolveEmployeeId(employeeId);
     if (!resolvedEmployeeId) return [];
     const [
@@ -213,14 +223,17 @@ export class OrganizationRepository {
     ] = await Promise.all([
       database
         .from('team_memberships')
-        .select('team_id')
+        .select('team_id,roles(code)')
         .eq('employee_id', resolvedEmployeeId)
-        .eq('is_active', true),
+        .eq('is_active', true)
+        .is('ended_at', null),
       database
         .from('team_project_memberships')
         .select('team_project_id')
         .eq('employee_id', resolvedEmployeeId)
-        .eq('is_active', true),
+        .eq('is_active', true)
+        .lte('started_at', today)
+        .or(`ended_at.is.null,ended_at.gte.${today}`),
     ]);
     if (membershipError)
       this.throwDatabaseError('team memberships', membershipError);
@@ -236,7 +249,10 @@ export class OrganizationRepository {
     if (projectIds.length) {
       const { data: assignments, error: assignmentError } = await database
         .from('team_projects')
-        .select('team_id')
+        .select('team_id,projects!inner(status,deleted_at)')
+        .is('ended_at', null)
+        .not('projects.status', 'in', '(completed,cancelled)')
+        .is('projects.deleted_at', null)
         .in('id', projectIds);
       if (assignmentError)
         this.throwDatabaseError('team project assignments', assignmentError);
@@ -244,7 +260,9 @@ export class OrganizationRepository {
     }
     const teamIds = [
       ...new Set([
-        ...(memberships ?? []).map((row) => row.team_id),
+        ...(memberships ?? [])
+          .filter((row) => this.isRegularTeamMembership(row))
+          .map((row) => row.team_id),
         ...projectTeamIds,
       ]),
     ];
@@ -261,6 +279,7 @@ export class OrganizationRepository {
 
   async isEmployeeInTeam(employeeId: string, teamId: string): Promise<boolean> {
     const database = this.supabaseClient.getV2Client();
+    const today = new Date().toISOString().slice(0, 10);
     const resolvedEmployeeId = await this.resolveEmployeeId(employeeId);
     if (!resolvedEmployeeId) return false;
     const [
@@ -269,21 +288,25 @@ export class OrganizationRepository {
     ] = await Promise.all([
       database
         .from('team_memberships')
-        .select('employee_id')
+        .select('employee_id,roles(code)')
         .eq('employee_id', resolvedEmployeeId)
         .eq('team_id', teamId)
         .eq('is_active', true)
+        .is('ended_at', null)
         .limit(1),
       database
         .from('team_project_memberships')
         .select('team_project_id')
         .eq('employee_id', resolvedEmployeeId)
-        .eq('is_active', true),
+        .eq('is_active', true)
+        .lte('started_at', today)
+        .or(`ended_at.is.null,ended_at.gte.${today}`),
     ]);
     if (teamError) this.throwDatabaseError('team memberships', teamError);
     if (projectError)
       this.throwDatabaseError('team project memberships', projectError);
-    if (teamMemberships?.length) return true;
+    if (teamMemberships?.some((row) => this.isRegularTeamMembership(row)))
+      return true;
 
     const projectIds = (projectMemberships ?? []).map(
       (row) => row.team_project_id,
@@ -291,13 +314,23 @@ export class OrganizationRepository {
     if (!projectIds.length) return false;
     const { data: assignments, error: assignmentError } = await database
       .from('team_projects')
-      .select('id')
+      .select('id,projects!inner(status,deleted_at)')
+      .is('ended_at', null)
+      .not('projects.status', 'in', '(completed,cancelled)')
+      .is('projects.deleted_at', null)
       .in('id', projectIds)
       .eq('team_id', teamId)
       .limit(1);
     if (assignmentError)
       this.throwDatabaseError('team project assignments', assignmentError);
     return Boolean(assignments?.length);
+  }
+
+  // Las filas directas de líderes son de ubicación; la designación vigente
+  // en team_project_memberships es la que concede acceso al equipo.
+  private isRegularTeamMembership(row: { roles: unknown }): boolean {
+    const role = row.roles as { code?: string } | null;
+    return !['ARCHITECT', 'SCRUM_MASTER'].includes(role?.code ?? '');
   }
 
   private async resolveEmployeeId(identifier: string): Promise<string | null> {
@@ -309,6 +342,7 @@ export class OrganizationRepository {
     const query = database
       .from('employees')
       .select('id')
+      .eq('status', 'active')
       .is('deleted_at', null)
       .limit(1);
     const { data, error } = isUuid
@@ -361,6 +395,108 @@ export class OrganizationRepository {
     }));
   }
 
+  async findTeamLeaders(teamId: string): Promise<TeamLeaders> {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('team_project_memberships')
+      .select(
+        'team_projects!inner(team_id,ended_at,projects!inner(status,deleted_at)),employees!inner(id,employee_code,full_name,email),roles!inner(code)',
+      )
+      .eq('is_active', true)
+      .lte('started_at', today)
+      .or(`ended_at.is.null,ended_at.gte.${today}`)
+      .eq('team_projects.team_id', teamId)
+      .is('team_projects.ended_at', null)
+      .not('team_projects.projects.status', 'in', '(completed,cancelled)')
+      .is('team_projects.projects.deleted_at', null)
+      .eq('employees.status', 'active')
+      .is('employees.deleted_at', null)
+      .in('roles.code', ['ARCHITECT', 'SCRUM_MASTER'])
+      .order('started_at', { ascending: false })
+      .order('id');
+    if (error) this.throwDatabaseError('líderes de equipo', error);
+    return this.mapTeamLeaders((data ?? []) as unknown as LeaderEmployeeRow[]);
+  }
+
+  async hasActiveEmployeeRole(
+    employeeId: string,
+    roleId: string,
+  ): Promise<boolean> {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('employee_roles')
+      .select('employee_id,employees!inner(id)')
+      .eq('employee_id', employeeId)
+      .eq('role_id', roleId)
+      .lte('started_at', today)
+      .or(`ended_at.is.null,ended_at.gte.${today}`)
+      .eq('employees.status', 'active')
+      .is('employees.deleted_at', null)
+      .limit(1);
+    if (error) this.throwDatabaseError('rol vigente del empleado', error);
+    return (data ?? []).length > 0;
+  }
+
+  async findLeaderCandidates(): Promise<LeaderCandidates> {
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('employee_roles')
+      .select(
+        'employees!inner(id,employee_code,full_name,email),roles!inner(code)',
+      )
+      .lte('started_at', today)
+      .or(`ended_at.is.null,ended_at.gte.${today}`)
+      .eq('employees.status', 'active')
+      .is('employees.deleted_at', null)
+      .in('roles.code', ['ARCHITECT', 'SCRUM_MASTER']);
+    if (error) this.throwDatabaseError('candidatos a líderes', error);
+    const rows = (data ?? []) as unknown as LeaderEmployeeRow[];
+    const candidates = (code: string) =>
+      [
+        ...new Map(
+          rows
+            .filter((row) => row.roles.code === code)
+            .map((row) => [row.employees.id, this.mapEmployee(row.employees)]),
+        ).values(),
+      ].sort((a, b) => a.fullName.localeCompare(b.fullName));
+    return {
+      architects: candidates('ARCHITECT'),
+      scrumMasters: candidates('SCRUM_MASTER'),
+    };
+  }
+
+  async replaceTeamLeader(
+    teamId: string,
+    roleCode: string,
+    employeeId: string | null,
+    createdBy: string,
+  ): Promise<ReplaceTeamLeaderResult> {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .rpc('replace_team_leader', {
+        p_team_id: teamId,
+        p_role_code: roleCode,
+        p_employee_id: employeeId,
+        p_created_by: createdBy,
+      });
+    if (error) this.throwMutationError('líder de equipo', error);
+    return data as ReplaceTeamLeaderResult;
+  }
+
+  private mapTeamLeaders(rows: LeaderEmployeeRow[]): TeamLeaders {
+    const employeeFor = (code: string) => {
+      const row = rows.find((row) => row.roles.code === code);
+      return row ? this.mapEmployee(row.employees) : null;
+    };
+    return {
+      architect: employeeFor('ARCHITECT'),
+      scrumMaster: employeeFor('SCRUM_MASTER'),
+    };
+  }
+
   async findTeamOrganization(teamId: string): Promise<TeamOrganization | null> {
     const database = this.supabaseClient.getV2Client();
     const { data: teamRow, error: teamError } = await database
@@ -384,7 +520,11 @@ export class OrganizationRepository {
     const assignments = (assignmentRows ?? []) as TeamProjectAssignmentRow[];
     const projectIds = assignments.map((row) => row.project_id);
     if (!projectIds.length)
-      return { team: this.mapTeam(teamRow), assignments: [] };
+      return {
+        team: this.mapTeam(teamRow),
+        assignments: [],
+        leaders: { architect: null, scrumMaster: null },
+      };
 
     const { data: projectRows, error: projectsError } = await database
       .from('projects')
@@ -453,6 +593,7 @@ export class OrganizationRepository {
 
     return {
       team: this.mapTeam(teamRow),
+      leaders: await this.findTeamLeaders(teamId),
       assignments: assignments.flatMap((assignment) => {
         const project = projectsById.get(assignment.project_id);
         const client = project ? clientsById.get(project.clientId) : null;
@@ -649,6 +790,9 @@ export class OrganizationRepository {
     resource: string,
     error: { code?: string; message?: string },
   ): never {
+    if (error.code === 'P0001') {
+      throw new BadRequestException(error.message);
+    }
     if (error.code === '23505') {
       throw new ConflictException(
         `A ${resource} with the same unique value already exists`,

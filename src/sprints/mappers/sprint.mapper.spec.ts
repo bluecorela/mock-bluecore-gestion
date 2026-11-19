@@ -1,6 +1,15 @@
 import { mapDashboard, mapSprint, mapTeamInitiative } from './sprint.mapper';
 
 describe('sprint mappers', () => {
+  it.each([
+    ['20.00', 20],
+    [null, null],
+  ])('maps closed scope %s', (value, expected) => {
+    expect(mapSprint({ closed_scope_points: value })).toMatchObject({
+      closedScopePoints: expected,
+    });
+  });
+
   it('maps a sprint database row to the domain contract', () => {
     const sprint = mapSprint({
       id: 'sprint-id',

@@ -18,8 +18,6 @@ export const SIDEBAR_ROLE_CODES = [
   'SCRUM_MASTER',
   'SOFTWARE_ENGINEER',
   'QA_ENGINEER',
-  'WELLBEING_CREATOR',
-  'INTERN',
 ] as const;
 
 export class CreateSidebarModuleDto {
