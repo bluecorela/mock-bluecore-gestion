@@ -24,6 +24,10 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api', {
     exclude: [
+      '/',
+      'health',
+      'api',
+      'api/health',
       { path: 'mcp', method: RequestMethod.ALL },
       {
         path: '.well-known/oauth-protected-resource',

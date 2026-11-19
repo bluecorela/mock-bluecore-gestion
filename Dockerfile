@@ -10,10 +10,10 @@ RUN npm run build
 FROM node:22-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production \
-    PORT=3000
+  PORT=3000
 COPY package*.json ./
 RUN npm ci --omit=dev --no-audit --no-fund \
-    && npm cache clean --force
+  && npm cache clean --force
 COPY --from=builder --chown=node:node /app/dist ./dist
 USER node
 EXPOSE 3000
