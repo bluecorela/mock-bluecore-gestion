@@ -1,0 +1,202 @@
+export interface MemberSummary {
+  id?: string;
+  name: string;
+  total1: number;
+  total2: number;
+  total3: number;
+  total_final: number;
+  rating: string;
+  comments?: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+}
+
+export interface Personnel {
+  id: string;
+  employeeId?: string;
+  name: string | null;
+  role: string | null;
+  email: string | null;
+  teamId: string | null;
+  teamIds?: string[];
+  status: 'activo' | 'inactivo' | null;
+  onVacation: boolean | null;
+  replacementStartSprintId: string | null;
+  team?: { id: string; path: string; referencePath: string } | null;
+  teams?: Array<{ id: string; path: string; referencePath: string }>;
+}
+
+export type OperationalSprintStatus =
+  | 'planned'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled';
+
+export interface Sprint {
+  id: string;
+  code: string;
+  team_id: string;
+  start_date: string | null;
+  end_date: string | null;
+  sprint_closed: boolean | null;
+  status: OperationalSprintStatus;
+}
+
+export interface SprintMember {
+  id: string;
+  employeeCode: string;
+  sprint_id: string;
+  team_id: string;
+  name: string | null;
+  assigned_tasks: number | null;
+  delivered_tasks: number | null;
+  returned_tasks: number | null;
+  code_quality: number | null;
+  total1: number | null;
+  total2: number | null;
+  total3: number | null;
+  total_final: number | null;
+  rating: string | null;
+  comments: string | null;
+  evaluated_by: string | null;
+  evaluation_date: string | null;
+}
+
+export interface CurrentEngineer {
+  id: string;
+  name: string;
+  replacementStartSprintId: string | null;
+  onVacation: boolean | null;
+}
+
+export interface DashboardMember {
+  id?: string;
+  name: string;
+  total1?: number | null;
+  total2?: number | null;
+  total3?: number | null;
+  total_final: number | null;
+  rating: string | null;
+  comments?: string | null;
+}
+
+export interface DashboardSprint {
+  id: string;
+  startDate: string | Date | null;
+  endDate: string | Date | null;
+  sprintClosed: boolean | null;
+  members: DashboardMember[];
+}
+
+export type SprintStatus =
+  | 'Planificado'
+  | 'En curso'
+  | 'Completado'
+  | 'Cancelado';
+
+export interface DashboardSprintWithStatus extends DashboardSprint {
+  status: SprintStatus;
+}
+
+export interface BarChartData {
+  labels: string[];
+  datasets: Array<{ data: number[] }>;
+}
+
+export interface PerformanceSummary {
+  sprintId: string;
+  average: number;
+  status: 'Completado' | 'En proceso';
+  rating: string;
+  totalEvaluated: number;
+}
+
+export interface PerformanceTrend {
+  labels: string[];
+  values: number[];
+}
+
+export interface TeamDashboardData {
+  team: Pick<Team, 'id' | 'name'>;
+  stats: {
+    totalMembers: number;
+    totalSprints: number;
+    averagePerformance: number;
+    ratedPerformance: string;
+  };
+  sprints: DashboardSprintWithStatus[];
+  charts: {
+    barChart: BarChartData;
+    lineChart: PerformanceTrend | null;
+    chartSprintId: string | null;
+  };
+}
+
+export interface RotationHistory {
+  id?: string;
+  personnelId?: string;
+  type?: string;
+  date?: string | Date;
+  fromTeam?: string | null;
+  sourceName?: string | null;
+  toTeam?: string | null;
+  destinationName?: string | null;
+}
+
+export interface TeamSprintResponse {
+  id: string;
+  name: string;
+  startDate: string | Date | null;
+  endDate: string | Date | null;
+  sprintClosed: boolean | null;
+}
+
+export interface SaveEvaluationRequest {
+  teamId: string;
+  employeeId: string;
+  sprintId: string;
+  startDate: string;
+  endDate: string;
+  engineer: string;
+  metrics: Record<string, number>;
+  finalScore: number;
+  ratingLabel: string;
+  comments?: string;
+  evaluatorEmail: string;
+}
+
+export interface CreatePersonnelData {
+  name: string;
+  role: string;
+  email: string;
+  teamId?: string;
+  status?: 'activo' | 'inactivo';
+  authUserId?: string;
+  createdBy?: string;
+}
+
+export interface UpdatePersonnelData {
+  name?: string;
+  role?: string;
+  email?: string | null;
+  teamId?: string | null;
+  status?: 'activo' | 'inactivo';
+  createdBy?: string;
+}
+
+export interface SidebarModule {
+  id: string;
+  name: string | null;
+  route: string | null;
+  icon: string | null;
+  order: number | null;
+  visible: boolean | null;
+  permittedRoles: string[] | null;
+}
+
+export interface MaintenanceStatus {
+  active: boolean;
+}

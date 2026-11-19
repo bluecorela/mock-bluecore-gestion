@@ -1,0 +1,17 @@
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { HealthService } from './health.service';
+import { PublicRoute } from '../auth/access.decorators';
+
+@PublicRoute()
+@ApiTags('Health')
+@Controller('health')
+export class HealthController {
+  constructor(private readonly healthService: HealthService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Check API and database readiness' })
+  check() {
+    return this.healthService.check();
+  }
+}

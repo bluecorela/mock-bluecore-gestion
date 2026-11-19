@@ -1,0 +1,409 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { CreateTeamDto } from './dto/create-team.dto';
+import { OperationsService } from '../operations/operations.service';
+import { SupabaseDataService } from '../supabase/supabase-data.service';
+import {
+  BarChartData,
+  Team,
+  DashboardMember,
+  DashboardSprintWithStatus,
+  TeamDashboardData,
+  TeamSprintResponse,
+  SaveEvaluationRequest,
+  CurrentEngineer,
+  MemberSummary,
+  SprintStatus,
+  OperationalSprintStatus,
+} from '../supabase/interfaces/supabase-interface';
+import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
+import { SaveSprintEvaluationDto } from './dto/save-sprint-evaluation.dto';
+import { SprintsService } from '../sprints/services/sprints.service';
+
+@Injectable()
+export class TeamsService {
+  constructor(
+    private readonly operacionesService: OperationsService,
+    private readonly supabaseDataService: SupabaseDataService,
+    private readonly sprintsService: SprintsService,
+  ) {}
+
+  assertTeamAccess(teamId: string, user: AuthenticatedUser) {
+    return this.supabaseDataService.assertLegacyTeamAccess(teamId, user);
+  }
+
+  async getOverview(user: AuthenticatedUser) {
+    const teams = await this.findAllForUser(user);
+    return Promise.all(
+      teams.map(async (team) => {
+        const members = await this.supabaseDataService.getEmployeeByTeam(
+          team.id,
+        );
+        return {
+          team,
+          members: members.map((member) => ({
+            id: member.id,
+            name: member.name ?? '',
+            role: member.role ?? '',
+          })),
+        };
+      }),
+    );
+  }
+
+  async getHomeContext(user: AuthenticatedUser) {
+    const teams = await this.findAllForUser(user);
+    const selectedTeamId = teams[0]?.id ?? null;
+    const dashboard = selectedTeamId
+      ? await this.getHomeDashboard(selectedTeamId)
+      : null;
+
+    return {
+      user: {
+        id: user.personnelId,
+        name: user.name,
+        role: user.role,
+        teamId: user.teamId,
+      },
+      teams: teams.map((team) => ({ id: team.id, name: team.name })),
+      selectedTeamId,
+      dashboard,
+    };
+  }
+
+  async getDashboardData(teamId: string): Promise<TeamDashboardData | null> {
+    const team = await this.supabaseDataService.getTeam(teamId);
+    if (!team) return null;
+
+    const personnel = await this.supabaseDataService.getEmployeeByTeam(teamId);
+    const allowedRoles = ['Ingeniero de Software', 'Ingeniero de QA'];
+    const currentEngineers: CurrentEngineer[] = personnel
+      .filter((p) =>
+        allowedRoles.some((role) =>
+          p.role?.toLowerCase().includes(role.toLowerCase()),
+        ),
+      )
+      .map((p) => ({
+        id: p.id,
+        name: p.name ?? '',
+        replacementStartSprintId: p.replacementStartSprintId || null,
+        onVacation: p.onVacation ?? null,
+      }));
+
+    const historyData = await this.supabaseDataService.getRotationHistory();
+    const rawSprints = await this.supabaseDataService.getSprintsByTeam(teamId);
+
+    const statusLabels: Record<OperationalSprintStatus, SprintStatus> = {
+      planned: 'Planificado',
+      in_progress: 'En curso',
+      completed: 'Completado',
+      cancelled: 'Cancelado',
+    };
+    const sprints: DashboardSprintWithStatus[] = await Promise.all(
+      rawSprints.map(async (s) => {
+        const members = await this.supabaseDataService.getMembersBySprint(
+          teamId,
+          s.code,
+        );
+        return {
+          id: s.code,
+          status: statusLabels[s.status],
+          startDate: s.start_date ?? null,
+          endDate: s.end_date ?? null,
+          sprintClosed: s.sprint_closed ?? null,
+          members: members.map(
+            (member): DashboardMember => ({
+              id: member.id,
+              name: member.name ?? '',
+              total1: member.total1,
+              total2: member.total2,
+              total3: member.total3,
+              total_final: member.total_final,
+              rating: member.rating,
+              comments: member.comments,
+            }),
+          ),
+        };
+      }),
+    );
+
+    const sortedSprints = [...sprints].sort((a, b) => {
+      const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    const dashboardSprints = sortedSprints;
+    const lastPerformance =
+      this.operacionesService.calculateLastClosedSprintPerformance(
+        sprints,
+        historyData,
+        currentEngineers,
+      );
+
+    const trend = this.operacionesService.calculateSprintPerformance(
+      sprints,
+      historyData,
+      currentEngineers,
+    );
+    let barChartData: BarChartData = {
+      labels: [],
+      datasets: [{ data: [] }],
+    };
+    let chartSprintId: string | null = null;
+
+    for (const s of sortedSprints) {
+      const evaluatedMembers = s.members.filter(
+        (i) => i.rating !== 'Arquitecto',
+      );
+      if (evaluatedMembers.length > 0) {
+        barChartData = {
+          labels: evaluatedMembers.map((i) => i.name),
+          datasets: [
+            {
+              data: evaluatedMembers.map((i) => i.total_final ?? 0),
+            },
+          ],
+        };
+        chartSprintId = s.id;
+        break;
+      }
+    }
+
+    return {
+      team: {
+        id: team.id,
+        name: team.name,
+      },
+      stats: {
+        totalMembers: personnel.length,
+        totalSprints: rawSprints.filter((s) => s.status === 'completed').length,
+        averagePerformance: lastPerformance?.average ?? 0,
+        ratedPerformance: lastPerformance?.rating ?? 'Sin datos',
+      },
+      sprints: dashboardSprints,
+      charts: {
+        barChart: barChartData,
+        lineChart: trend,
+        chartSprintId: chartSprintId,
+      },
+    };
+  }
+  async getHomeDashboard(teamId: string) {
+    const team = await this.getTeam(teamId);
+    if (!team) return null;
+    const legacyDashboard = await this.getDashboardData(teamId);
+    let sprints: Awaited<ReturnType<SprintsService['findByTeam']>> = [];
+    try {
+      sprints = await this.sprintsService.findByTeam(teamId);
+    } catch (error) {
+      console.warn('Operational sprints unavailable for Home:', error);
+    }
+    const today = this.sprintsService.today();
+    const sprintForToday = sprints.find(
+      (s) =>
+        s.startDate <= today &&
+        s.endDate >= today &&
+        ['planned', 'in_progress'].includes(s.status),
+    );
+    const currentSprint =
+      sprintForToday ??
+      sprints.find((s) => s.status === 'in_progress') ??
+      [...sprints]
+        .filter((s) => s.status === 'planned' && s.startDate > today)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0] ??
+      sprints[0] ??
+      null;
+    let sprintDashboard: any = null;
+    if (currentSprint) {
+      try {
+        sprintDashboard = await this.sprintsService.dashboard(
+          teamId,
+          currentSprint.id,
+        );
+      } catch (error) {
+        console.warn(
+          'Operational sprint dashboard unavailable for Home:',
+          error,
+        );
+      }
+    }
+
+    let initiatives: Awaited<
+      ReturnType<SprintsService['findHomeInitiatives']>
+    > | null = null;
+    try {
+      initiatives = await this.sprintsService.findHomeInitiatives(teamId);
+    } catch (error) {
+      console.warn('Team initiatives unavailable for Home:', error);
+    }
+
+    return {
+      team: { id: team.id, name: team.name },
+      stats: legacyDashboard?.stats ?? null,
+      sprints: legacyDashboard?.sprints ?? [],
+      charts: legacyDashboard?.charts ?? null,
+      currentSprint,
+      sprintDashboard,
+      initiatives,
+      recentSprints: sprints.slice(0, 5),
+      performance: legacyDashboard?.stats ?? null,
+      performanceCharts: legacyDashboard?.charts ?? null,
+    };
+  }
+
+  async findAll(onlyWithEvaluations = false): Promise<Team[]> {
+    return this.supabaseDataService.getTeams(onlyWithEvaluations);
+  }
+
+  async findAllForUser(
+    user: AuthenticatedUser,
+    onlyWithEvaluations = false,
+  ): Promise<Team[]> {
+    return this.supabaseDataService.findLegacyTeamsForUser(
+      user,
+      onlyWithEvaluations,
+    );
+  }
+
+  async getSprintsByTeam(teamId: string): Promise<TeamSprintResponse[]> {
+    const sprints = await this.supabaseDataService.getSprintsByTeam(teamId);
+    return sprints.map((s) => ({
+      id: s.code,
+      name: s.code,
+      startDate: s.start_date ?? null,
+      endDate: s.end_date ?? null,
+      sprintClosed: s.sprint_closed ?? null,
+    }));
+  }
+  async getMembersBySprint(
+    teamId: string,
+    sprintId: string,
+  ): Promise<MemberSummary[]> {
+    return this.supabaseDataService.getLegacyMembersBySprint(teamId, sprintId);
+  }
+
+  async getTeam(teamId: string): Promise<Team | null> {
+    return this.supabaseDataService.getTeam(teamId);
+  }
+
+  async getMetricas(teamId: string, sprintId: string) {
+    return this.supabaseDataService.getMetrics(teamId, sprintId);
+  }
+
+  async create(createTeamDto: CreateTeamDto) {
+    return this.supabaseDataService.createTeam(createTeamDto.name);
+  }
+
+  async getSprintEvaluationStatus(teamId: string, sprintId?: string) {
+    return this.supabaseDataService.getSprintEvaluationStatus(teamId, sprintId);
+  }
+
+  async getSprintBoardContext(teamId: string) {
+    const [team, members, sprints, rotationHistory, evaluationStatus] =
+      await Promise.all([
+        this.getTeam(teamId),
+        this.supabaseDataService.getEmployeeByTeam(teamId),
+        this.getSprintsByTeam(teamId),
+        this.supabaseDataService.getRotationHistory(),
+        this.getSprintEvaluationStatus(teamId),
+      ]);
+    if (!team) return null;
+
+    const teamKeys = new Set([teamId, team.id, team.name].filter(Boolean));
+    const belongsToTeam = (value?: string | null) =>
+      value !== undefined && value !== null && teamKeys.has(value);
+    const relevantRotationHistory = rotationHistory.filter(
+      (event) =>
+        belongsToTeam(event.fromTeam) ||
+        belongsToTeam(event.toTeam) ||
+        belongsToTeam(event.sourceName) ||
+        belongsToTeam(event.destinationName),
+    );
+
+    return {
+      team,
+      members,
+      sprints,
+      rotationHistory: relevantRotationHistory,
+      evaluationStatus,
+    };
+  }
+
+  async saveEvaluation(data: Partial<SaveEvaluationRequest> | undefined) {
+    if (!data || typeof data !== 'object') {
+      throw new BadRequestException(
+        'El cuerpo de la evaluación es obligatorio',
+      );
+    }
+
+    const requiredFields: Array<keyof SaveEvaluationRequest> = [
+      'teamId',
+      'sprintId',
+      'startDate',
+      'endDate',
+      'engineer',
+      'metrics',
+      'finalScore',
+      'ratingLabel',
+      'evaluatorEmail',
+    ];
+    const missingFields = requiredFields.filter(
+      (field) => data[field] === undefined || data[field] === null,
+    );
+
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `Faltan campos obligatorios para guardar la evaluación: ${missingFields.join(', ')}`,
+      );
+    }
+
+    const input = data as SaveSprintEvaluationDto;
+    const taskCounts = new Set([
+      'assignedTasks',
+      'deliveredTasks',
+      'deliveredTasksAlternative',
+      'returnedTasks',
+    ]);
+    if (
+      input.startDate > input.endDate ||
+      !Number.isFinite(input.finalScore) ||
+      input.finalScore < 0 ||
+      input.finalScore > 100 ||
+      !input.metrics ||
+      typeof input.metrics !== 'object' ||
+      Array.isArray(input.metrics) ||
+      Object.entries(input.metrics).some(
+        ([key, value]) =>
+          !Number.isFinite(value) ||
+          value < 0 ||
+          (taskCounts.has(key) ? !Number.isInteger(value) : value > 100),
+      )
+    ) {
+      throw new BadRequestException(
+        'Métricas o fechas de evaluación inválidas',
+      );
+    }
+    const [sprint, members] = await Promise.all([
+      this.supabaseDataService.getSprint(data.teamId!, data.sprintId!),
+      this.supabaseDataService.getEmployeeByTeam(data.teamId!),
+    ]);
+    const matchingMembers = members.filter(
+      (member) =>
+        member.name?.toLocaleLowerCase() ===
+        data.engineer!.split(' – ')[0].toLocaleLowerCase(),
+    );
+    if (
+      (sprint &&
+        (sprint.start_date !== input.startDate ||
+          sprint.end_date !== input.endDate)) ||
+      matchingMembers.length !== 1
+    ) {
+      throw new BadRequestException('Sprint o integrante ajeno al equipo');
+    }
+
+    return this.supabaseDataService.saveEvaluation({
+      ...(data as SaveEvaluationRequest),
+      employeeId: matchingMembers[0].id,
+    });
+  }
+}

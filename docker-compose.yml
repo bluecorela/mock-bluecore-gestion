@@ -1,18 +1,28 @@
 services:
   api:
     build: .
-    pull_policy: build
-    container_name: bluecore-gestion
+    image: bluecore-gestion-api:local
     restart: unless-stopped
+    init: true
+    env_file:
+      - ${ENV_FILE:-.env}
     environment:
-      TZ: America/Panama
-      PORT: ${PORT}
-      FIREBASE_API_KEY: ${FIREBASE_API_KEY}
-      FIREBASE_AUTH_DOMAIN: ${FIREBASE_AUTH_DOMAIN}
-      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
-      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET}
-      FIREBASE_APP_ID: ${FIREBASE_APP_ID}
-      FIREBASE_EMAIL: ${FIREBASE_EMAIL}
-      FIREBASE_PASSWORD: ${FIREBASE_PASSWORD}
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${CONTAINER_PORT:-3000}
     ports:
-      - "3000:3000"
+      - "${API_PORT:-3000}:${CONTAINER_PORT:-3000}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -qO- http://127.0.0.1:$${PORT}/api/health >/dev/null || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
