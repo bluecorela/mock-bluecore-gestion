@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { ROLES_REQUIRING_TEAM } from '../auth/auth.constants';
 import { CreatePersonnelDto } from './dto/create-personnel.dto';
 import { SupabaseDataService } from '../supabase/supabase-data.service';
 
@@ -10,6 +11,13 @@ export class PersonnelService {
     return this.supabaseDataService.getPersonnelByEmail(
       decodeURIComponent(email),
     );
+  }
+
+  assertTeamAccess(
+    teamId: string,
+    user: import('../auth/interfaces/auth-user.interface').AuthenticatedUser,
+  ) {
+    return this.supabaseDataService.assertLegacyTeamAccess(teamId, user);
   }
 
   async findByTeam(teamId: string) {
@@ -27,10 +35,7 @@ export class PersonnelService {
   async create(createPersonnelDto: CreatePersonnelDto, createdBy?: string) {
     const { name, role, email, teamId } = createPersonnelDto;
 
-    if (
-      ['Ingeniero de Software', 'Ingeniero de QA', 'Pasante'].includes(role) &&
-      !teamId
-    ) {
+    if (ROLES_REQUIRING_TEAM.some((teamRole) => teamRole === role) && !teamId) {
       throw new BadRequestException(`El rol ${role} requiere equipo`);
     }
 

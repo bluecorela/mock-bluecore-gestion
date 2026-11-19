@@ -33,3 +33,8 @@ export function mapSprintItem(row: unknown): SprintItemRecord {
 
   return values;
 }
+
+export function mapSprintBug(row: unknown): SprintItemRecord {
+  const values = mapSprintItem(row);
+  return { ...values, story: values.story ?? null };
+}

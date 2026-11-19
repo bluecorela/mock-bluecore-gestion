@@ -25,6 +25,8 @@ export function mapSprint(value: unknown): Sprint {
     wipStories: field<number>(row, 'wip_stories'),
     scrumMasterId: field<string | null>(row, 'scrum_master_id'),
     architectId: field<string | null>(row, 'architect_id'),
+    closedScopePoints:
+      row.closed_scope_points == null ? null : Number(row.closed_scope_points),
     closedAt: field<string | null>(row, 'closed_at'),
     createdAt: field<string>(row, 'created_at'),
     updatedAt: field<string>(row, 'updated_at'),

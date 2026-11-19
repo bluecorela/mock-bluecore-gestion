@@ -13,6 +13,7 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
+import { PortalAccessGuard } from './auth/portal-access.guard';
 import { OrganizationModule } from './organization/organization.module';
 import { WeeklyDashboardModule } from './weekly-dashboard/weekly-dashboard.module';
 import { SprintsModule } from './sprints/sprints.module';
@@ -20,10 +21,13 @@ import {
   environmentFilePaths,
   validateEnvironment,
 } from './config/environment';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppThrottlerGuard } from './auth/app-throttler.guard';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { HealthModule } from './health/health.module';
 import { RequestLoggingInterceptor } from './observability/request-logging.interceptor';
+import { McpModule } from './mcp/mcp.module';
+import { UserAdminModule } from './user-admin/user-admin.module';
 
 @Module({
   imports: [
@@ -54,13 +58,19 @@ import { RequestLoggingInterceptor } from './observability/request-logging.inter
     WeeklyDashboardModule,
     SprintsModule,
     HealthModule,
+    McpModule,
+    UserAdminModule,
   ],
   controllers: [AppController],
   providers: [
     AppService,
     {
       provide: APP_GUARD,
-      useClass: ThrottlerGuard,
+      useClass: AppThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PortalAccessGuard,
     },
     {
       provide: APP_INTERCEPTOR,

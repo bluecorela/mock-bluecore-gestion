@@ -1,9 +1,18 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { HISTORICAL_ROLE_CODES } from '../../auth/auth.constants';
+import { ReplaceTeamLeaderDto } from '../dto/team-leader.dto';
+import type {
+  TeamLeaders,
+  TeamLeaderOverview,
+  LeaderCandidates,
+  ReplaceTeamLeaderResult,
+} from '../interfaces/organization.interface';
 import { OrganizationRepository } from '../repositories/organization.repository';
 import { CreateClientDto, UpdateClientDto } from '../dto/client.dto';
 import { CreateProjectDto, UpdateProjectDto } from '../dto/project.dto';
@@ -65,8 +74,8 @@ export class OrganizationService {
   findTeamsForUser(user: AuthenticatedUser) {
     if (user.role?.toLowerCase() === 'admin')
       return this.repository.findTeams();
-    if (!user.personnelId) return Promise.resolve([]);
-    return this.repository.findTeamsForEmployee(user.personnelId);
+    if (!user.employeeId) return Promise.resolve([]);
+    return this.repository.findTeamsForEmployee(user.employeeId);
   }
 
   async findEmployees(teamId?: string) {
@@ -77,8 +86,8 @@ export class OrganizationService {
   }
 
   async findEmployeesForUser(user: AuthenticatedUser) {
-    if (!user.personnelId) return [];
-    const teams = await this.repository.findTeamsForEmployee(user.personnelId);
+    if (!user.employeeId) return [];
+    const teams = await this.repository.findTeamsForEmployee(user.employeeId);
     const employees = await Promise.all(
       teams.map((team) => this.repository.findEmployees(team.id)),
     );
@@ -89,14 +98,75 @@ export class OrganizationService {
     ];
   }
 
-  findRoles() {
-    return this.repository.findRoles();
+  async findRoles() {
+    const roles = await this.repository.findRoles();
+    return roles.filter(
+      (role) => !HISTORICAL_ROLE_CODES.some((code) => code === role.code),
+    );
+  }
+
+  findTeamLeaders(teamId: string): Promise<TeamLeaders> {
+    return this.repository.findTeamLeaders(teamId);
+  }
+
+  async findAllTeamLeaders(): Promise<TeamLeaderOverview[]> {
+    const teams = await this.repository.findTeams();
+    return Promise.all(
+      teams.map(async ({ id, code, name }) => ({
+        team: { id, code, name },
+        ...(await this.findTeamLeaders(id)),
+      })),
+    );
+  }
+
+  findLeaderCandidates(): Promise<LeaderCandidates> {
+    return this.repository.findLeaderCandidates();
+  }
+
+  async replaceTeamLeader(
+    teamId: string,
+    role: string,
+    input: ReplaceTeamLeaderDto,
+    currentUser: AuthenticatedUser,
+  ): Promise<ReplaceTeamLeaderResult> {
+    if (role !== 'architect' && role !== 'scrum-master') {
+      throw new BadRequestException('El rol debe ser architect o scrum-master');
+    }
+    return this.repository.replaceTeamLeader(
+      teamId,
+      role === 'architect' ? 'ARCHITECT' : 'SCRUM_MASTER',
+      input.employeeId,
+      currentUser.supabaseUserId,
+    );
   }
 
   async findTeamOrganization(teamId: string) {
     const organization = await this.repository.findTeamOrganization(teamId);
     if (!organization) throw new NotFoundException('Team not found');
     return organization;
+  }
+
+  async assertTeamLeader(
+    teamId: string,
+    user: AuthenticatedUser,
+    roles: ('ARCHITECT' | 'SCRUM_MASTER')[],
+  ): Promise<void> {
+    if (user.role === 'Admin') return;
+    const leaders = await this.findTeamLeaders(teamId);
+    if (
+      user.employeeId &&
+      roles.some(
+        (role) =>
+          (role === 'ARCHITECT' ? leaders.architect : leaders.scrumMaster)
+            ?.id === user.employeeId,
+      )
+    )
+      return;
+    throw new ForbiddenException(
+      roles.length === 1
+        ? 'Solo el Arquitecto del equipo puede realizar esta acción'
+        : 'Solo los líderes del equipo pueden realizar esta acción',
+    );
   }
 
   async assertTeamAccess(
@@ -108,14 +178,14 @@ export class OrganizationService {
 
     if (
       user.role !== 'Admin' &&
-      user.personnelId &&
-      !(await this.repository.isEmployeeInTeam(user.personnelId, teamId))
+      user.employeeId &&
+      !(await this.repository.isEmployeeInTeam(user.employeeId, teamId))
     ) {
       throw new ForbiddenException(
         'No tiene permisos para acceder a este equipo',
       );
     }
-    if (user.role !== 'Admin' && !user.personnelId) {
+    if (user.role !== 'Admin' && !user.employeeId) {
       throw new ForbiddenException(
         'No tiene permisos para acceder a este equipo',
       );
@@ -134,11 +204,42 @@ export class OrganizationService {
     );
     if (!assignment)
       throw new NotFoundException('Team project assignment not found');
-    if (!(await this.repository.findEmployeeById(input.employeeId))) {
+    const employee = await this.repository.findEmployeeById(input.employeeId);
+    const role = await this.repository.findRoleById(input.roleId);
+    if (!role) {
+      throw new NotFoundException('Role not found');
+    }
+    if (HISTORICAL_ROLE_CODES.some((code) => code === role.code)) {
+      throw new BadRequestException(
+        `El rol ${role.name} es histórico y no se puede asignar`,
+      );
+    }
+    const isLeaderRole =
+      role.code === 'ARCHITECT' || role.code === 'SCRUM_MASTER';
+    if (!employee && !isLeaderRole) {
       throw new NotFoundException('Employee not found');
     }
-    if (!(await this.repository.findRoleById(input.roleId))) {
-      throw new NotFoundException('Role not found');
+    if (isLeaderRole) {
+      if (
+        !(await this.repository.hasActiveEmployeeRole(
+          input.employeeId,
+          input.roleId,
+        ))
+      ) {
+        const roleName =
+          role.code === 'ARCHITECT' ? 'Arquitecto' : 'Scrum Master';
+        throw new BadRequestException(
+          `La persona no tiene el rol ${roleName} vigente. Cámbiale primero el rol en Usuarios.`,
+        );
+      }
+      const leaders = await this.findTeamLeaders(teamId);
+      const leader =
+        role.code === 'ARCHITECT' ? leaders.architect : leaders.scrumMaster;
+      if (leader && leader.id !== input.employeeId) {
+        throw new ConflictException(
+          `El equipo ya tiene otro líder con este rol: ${leader.fullName}. Usa Reemplazar en Equipos.`,
+        );
+      }
     }
     this.validateMembershipDate(
       input.startedAt,
@@ -171,6 +272,13 @@ export class OrganizationService {
     );
     if (!membership)
       throw new NotFoundException('Team project membership not found');
+    const role = await this.repository.findRoleById(membership.role_id);
+    if (!role) throw new NotFoundException('Role not found');
+    if (role.code === 'ARCHITECT') {
+      throw new BadRequestException(
+        'El arquitecto no se puede quitar. Usa Reemplazar en Equipos.',
+      );
+    }
     if (!membership.is_active)
       throw new BadRequestException(
         'Team project membership is already inactive',

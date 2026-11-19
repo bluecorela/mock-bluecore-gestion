@@ -15,6 +15,16 @@ import { LoginDto } from './dto/login.dto';
 import { ROLES_REQUIRING_TEAM } from './auth.constants';
 import type { Personnel } from '../supabase/interfaces/supabase-interface';
 
+// Solo lee el claim; no verifica la firma ni la vigencia del JWT.
+export function readOAuthClientId(token: string): string | null {
+  const payload = token.split('.')[1];
+  if (!payload) return null;
+  const claims = JSON.parse(
+    Buffer.from(payload, 'base64url').toString('utf8'),
+  ) as { client_id?: unknown };
+  return typeof claims.client_id === 'string' ? claims.client_id : null;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -64,9 +74,14 @@ export class AuthService {
 
   async validateAuthorizationHeader(
     authorization?: string,
+    options?: { allowOAuthClient?: boolean },
   ): Promise<AuthenticatedUser> {
     const token = this.extractBearerToken(authorization);
-    return this.validateAccessToken(token);
+    const user = await this.validateAccessToken(token);
+    if (user.oauthClientId !== null && !options?.allowOAuthClient) {
+      throw new UnauthorizedException('Este acceso de IA solo sirve en /mcp');
+    }
+    return user;
   }
 
   async validateAccessToken(token: string): Promise<AuthenticatedUser> {
@@ -75,6 +90,14 @@ export class AuthService {
       .auth.getUser(token);
 
     if (error || !data.user?.email) {
+      throw new UnauthorizedException('Token de Supabase inválido o expirado');
+    }
+
+    // Supabase ya validó el JWT; aquí solo se lee su payload.
+    let oauthClientId: string | null;
+    try {
+      oauthClientId = readOAuthClientId(token);
+    } catch {
       throw new UnauthorizedException('Token de Supabase inválido o expirado');
     }
 
@@ -110,12 +133,15 @@ export class AuthService {
 
     return {
       supabaseUserId: data.user.id,
+      oauthClientId,
       email: data.user.email,
       personnelId: personnel?.id ?? null,
+      employeeId: personnel?.employeeId ?? null,
       name: personnel?.name ?? null,
       role: personnel?.role ?? null,
       teamId: personnel?.teamId ?? null,
-      teamIds: personnel?.teamIds ?? (personnel?.teamId ? [personnel.teamId] : []),
+      teamIds:
+        personnel?.teamIds ?? (personnel?.teamId ? [personnel.teamId] : []),
       mustChangePassword: data.user.user_metadata?.mustChangePassword === true,
     };
   }
@@ -150,7 +176,7 @@ export class AuthService {
     return this.supabaseDataService.getPersonnelById(personnelId);
   }
 
-  async createUser(data: CreateAuthUserDto) {
+  async createUser(data: CreateAuthUserDto & { createdBy?: string }) {
     const existingPersonnel =
       await this.supabaseDataService.getPersonnelByEmail(data.email);
 
@@ -190,6 +216,7 @@ export class AuthService {
         teamId: data.teamId,
         status: 'activo',
         authUserId: authData.user.id,
+        createdBy: data.createdBy,
       });
     } catch {
       const { error: rollbackError } = await this.supabaseClient
@@ -278,14 +305,18 @@ export class AuthService {
       return { ok: true, user: updatedPersonnel, emailSent: false };
     } catch (error) {
       try {
-        await this.supabaseDataService.updatePersonnel(personnelId, {
-          name: currentPersonnel.name ?? undefined,
-          role: currentPersonnel.role ?? undefined,
-          email: currentPersonnel.email,
-          teamId: currentPersonnel.teamId,
-          status: currentPersonnel.status ?? undefined,
-          createdBy: updatedBy,
-        });
+        await this.supabaseDataService.updatePersonnel(
+          personnelId,
+          {
+            name: currentPersonnel.name ?? undefined,
+            role: currentPersonnel.role ?? undefined,
+            email: currentPersonnel.email,
+            teamId: currentPersonnel.teamId,
+            status: currentPersonnel.status ?? undefined,
+            createdBy: updatedBy,
+          },
+          { allowHistoricalRoles: true },
+        );
       } catch (rollbackError) {
         console.error(
           'No se pudo revertir la actualización del perfil',

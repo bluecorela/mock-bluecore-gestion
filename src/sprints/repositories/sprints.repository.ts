@@ -1,7 +1,11 @@
+import { sprintExceptionFromSupabase } from '../sprint-error-codes';
+import { sprintErrorMessage } from '../sprint-error-message';
+import { translateStoryLoadError } from '../load/story-load.repository';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
+  NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
 import { SupabaseClient } from '../../supabase/supabase.client';
@@ -55,6 +59,21 @@ export class SprintsRepository {
       .select('*')
       .eq('team_id', resolvedTeamId)
       .not('status', 'in', '(completed,cancelled)')
+      .order('created_at', { ascending: false });
+    if (error) this.fail('team initiatives', error);
+    return (data ?? []).map((row) => mapTeamInitiative(row));
+  }
+
+  async findTeamInitiatives(
+    teamId: string,
+  ): Promise<Record<string, unknown>[]> {
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return [];
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('team_initiatives')
+      .select('*')
+      .eq('team_id', resolvedTeamId)
       .order('created_at', { ascending: false });
     if (error) this.fail('team initiatives', error);
     return (data ?? []).map((row) => mapTeamInitiative(row));
@@ -114,6 +133,91 @@ export class SprintsRepository {
     return data ? mapDashboard(data) : null;
   }
 
+  async findNextPlannedSprint(
+    teamId: string,
+    projectId: string | null,
+    sprintNumber: number,
+  ): Promise<{ id: string; name: string; sprintNumber: number } | null> {
+    // La RPC compara con =: NULL no coincide con ningún proyecto.
+    if (projectId === null) return null;
+    const resolvedTeamId = await this.resolveTeamId(teamId);
+    if (!resolvedTeamId) return null;
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('sprints')
+      .select('id, name, sprint_number')
+      .eq('team_id', resolvedTeamId)
+      .eq('project_id', projectId)
+      .eq('status', 'planned')
+      .gt('sprint_number', sprintNumber)
+      .order('sprint_number', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (error) this.fail('next planned sprint', error);
+    return data
+      ? { id: data.id, name: data.name, sprintNumber: data.sprint_number }
+      : null;
+  }
+
+  async findTransfersOut(
+    sprintId: string,
+  ): Promise<
+    { storyId: string; targetSprintId: string; targetSprintName: string }[]
+  > {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('sprint_user_story_transfers')
+      .select(
+        'story_id, target_sprint_id, target:sprints!sprint_user_story_transfers_target_sprint_id_fkey(name)',
+      )
+      .eq('source_sprint_id', sprintId)
+      .returns<
+        {
+          story_id: string;
+          target_sprint_id: string;
+          target: { name: string };
+        }[]
+      >();
+    if (error) this.fail('sprint transfers', error);
+    return (data ?? []).map((row) => ({
+      storyId: row.story_id,
+      targetSprintId: row.target_sprint_id,
+      targetSprintName: row.target.name,
+    }));
+  }
+
+  async findTransfersIn(sprintId: string): Promise<
+    {
+      storyId: string;
+      sourceSprintId: string;
+      sourceSprintName: string;
+      movedAt: string;
+    }[]
+  > {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .from('sprint_user_story_transfers')
+      .select(
+        'story_id, source_sprint_id, moved_at, source:sprints!sprint_user_story_transfers_source_sprint_id_fkey(name)',
+      )
+      .eq('target_sprint_id', sprintId)
+      .returns<
+        {
+          story_id: string;
+          source_sprint_id: string;
+          source: { name: string };
+          moved_at: string;
+        }[]
+      >();
+    if (error) this.fail('sprint transfers', error);
+    return (data ?? []).map((row) => ({
+      storyId: row.story_id,
+      sourceSprintId: row.source_sprint_id,
+      sourceSprintName: row.source.name,
+      movedAt: row.moved_at,
+    }));
+  }
+
   async nextSprintNumber(teamId: string) {
     const { data, error } = await this.supabaseClient
       .getV2Client()
@@ -159,6 +263,29 @@ export class SprintsRepository {
     return mapSprint(data);
   }
 
+  async createWithStoryLoad(
+    teamId: string,
+    payload: Record<string, unknown>,
+    rows: Record<string, unknown>[],
+    confirmationId: string,
+    employeeId: string,
+  ) {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .rpc('create_sprint_with_story_load', {
+        p_team_id: teamId,
+        p_payload: payload,
+        p_stories: rows,
+        p_confirmation_id: confirmationId,
+        p_employee_id: employeeId,
+      });
+    if (error) translateStoryLoadError(error);
+    return {
+      sprint: mapSprint(data.sprint),
+      created: data.created as Array<{ id: string; code: string }>,
+    };
+  }
+
   async createWithStories(
     teamId: string,
     input: Record<string, unknown>,
@@ -192,6 +319,41 @@ export class SprintsRepository {
     return data ? mapSprint(data) : null;
   }
 
+  async deletePlanned(teamId: string, sprintId: string): Promise<void> {
+    const { error } = await this.supabaseClient
+      .getV2Client()
+      .rpc('delete_planned_sprint', {
+        p_team_id: teamId,
+        p_sprint_id: sprintId,
+      });
+    if (error?.code === 'P0002')
+      throw new NotFoundException('Sprint no encontrado');
+    if (error && ['P0001', '23503'].includes(error.code)) {
+      throw new ConflictException(sprintErrorMessage(error.message));
+    }
+    if (error) this.fail('eliminación del sprint', error);
+  }
+
+  async startTransactional(teamId: string, sprintId: string) {
+    const { data, error } = await this.supabaseClient
+      .getV2Client()
+      .rpc('start_sprint', {
+        p_team_id: teamId,
+        p_sprint_id: sprintId,
+      });
+    const codedError = sprintExceptionFromSupabase(error);
+    if (codedError) throw codedError;
+    // Respaldo eliminable cuando la nube tenga la migración 20261118.
+    if (
+      error?.code === 'P0001' &&
+      ['Sprint not found', 'Sprint no encontrado'].includes(error.message ?? '')
+    ) {
+      throw new NotFoundException('Sprint not found');
+    }
+    if (error) this.fail('sprint start', error);
+    return data ? mapSprint(data) : null;
+  }
+
   async completeTransactional(teamId: string, sprintId: string) {
     const { data, error } = await this.supabaseClient
       .getV2Client()
@@ -205,16 +367,19 @@ export class SprintsRepository {
 
   private fail(
     resource: string,
-    error: { code?: string; message?: string },
+    error: { code?: string; details?: string; message?: string },
   ): never {
+    const codedError = sprintExceptionFromSupabase(error);
+    if (codedError) throw codedError;
+    // Respaldo eliminable cuando la nube tenga la migración 20261118.
     if (error.code === '23505') {
       throw new ConflictException(`Conflict while saving ${resource}`);
     }
     if (['23503', '23514', 'P0001'].includes(error.code ?? '')) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException(sprintErrorMessage(error.message));
     }
     throw new InternalServerErrorException(
-      `Could not access ${resource}: ${error.message || 'unknown error'}`,
+      `Could not access ${resource}: ${sprintErrorMessage(error.message) || 'unknown error'}`,
     );
   }
 

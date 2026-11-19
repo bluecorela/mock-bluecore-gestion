@@ -16,6 +16,7 @@ export interface Sprint {
   endDate: string;
   committedPoints: number;
   completedPoints: number;
+  closedScopePoints: number | null;
   wipStories: number;
   scrumMasterId: string | null;
   architectId: string | null;

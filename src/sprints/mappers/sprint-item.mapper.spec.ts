@@ -1,5 +1,5 @@
 import { InternalServerErrorException } from '@nestjs/common';
-import { mapSprintItem } from './sprint-item.mapper';
+import { mapSprintItem, mapSprintBug } from './sprint-item.mapper';
 
 describe('mapSprintItem', () => {
   it('maps snake case fields to camel case', () => {
@@ -30,4 +30,15 @@ describe('mapSprintItem', () => {
       }).status,
     ).toBe('cancelled');
   });
+});
+
+describe('mapSprintBug', () => {
+  it.each([[{ code: 'HU-12', name: 'Login' }], [null], [undefined]])(
+    'mapea la HU embebida %s',
+    (story) => {
+      expect(mapSprintBug({ story_id: 'story', story }).story).toEqual(
+        story ?? null,
+      );
+    },
+  );
 });

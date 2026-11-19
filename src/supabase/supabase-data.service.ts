@@ -1,3 +1,4 @@
+import { OrganizationRepository } from '../organization/repositories/organization.repository';
 import { Injectable } from '@nestjs/common';
 import { SupabaseClient } from './supabase.client';
 import {
@@ -18,6 +19,7 @@ import { ForbiddenException } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/interfaces/auth-user.interface';
 import { TeamDirectoryRepository } from './repositories/team-directory.repository';
 import { NavigationRepository } from './repositories/navigation.repository';
+import type { HISTORICAL_ROLE_CODES } from '../auth/auth.constants';
 
 interface RoleSummaryRow {
   id: string;
@@ -79,7 +81,7 @@ interface SprintRow {
   sprint_number: number;
   start_date: string | null;
   end_date: string | null;
-  status: string;
+  status: Sprint['status'];
 }
 
 interface PerformanceAnswerRow {
@@ -108,6 +110,7 @@ export class SupabaseDataService {
     private readonly supabaseClient: SupabaseClient,
     private readonly teamDirectory: TeamDirectoryRepository,
     private readonly navigation: NavigationRepository,
+    private readonly organization: OrganizationRepository,
   ) {}
 
   async assertLegacyTeamAccess(
@@ -115,12 +118,35 @@ export class SupabaseDataService {
     user: AuthenticatedUser,
   ): Promise<void> {
     if (user.role === 'Admin') return;
-    if (!user.personnelId)
-      throw new ForbiddenException('No tiene acceso a este equipo');
-    const members = await this.getEmployeeByTeam(teamId);
-    if (!members.some((member) => member.id === user.personnelId)) {
+    const { data: team, error } = await this.supabaseClient
+      .getV2Client()
+      .from('teams')
+      .select('id')
+      .eq('code', teamId.toLowerCase())
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw error;
+    if (
+      !user.employeeId ||
+      !team ||
+      !(await this.organization.isEmployeeInTeam(user.employeeId, team.id))
+    ) {
       throw new ForbiddenException('No tiene acceso a este equipo');
     }
+  }
+
+  async findLegacyTeamsForUser(
+    user: AuthenticatedUser,
+    onlyWithEvaluations = false,
+  ): Promise<Team[]> {
+    const teams = await this.getTeams(onlyWithEvaluations);
+    if (user.role === 'Admin') return teams;
+    if (!user.employeeId) return [];
+    const allowed = await this.organization.findTeamsForEmployee(
+      user.employeeId,
+    );
+    const codes = new Set(allowed.map((team) => team.code));
+    return teams.filter((team) => codes.has(team.id));
   }
 
   private slug(value: string): string {
@@ -316,6 +342,7 @@ export class SupabaseDataService {
     const vacationingIds = new Set(
       (absences.data ?? []).map((absence) => absence.employee_id),
     );
+    // Solo lectura: filas históricas.
     const legacyRoles: Record<string, string> = {
       ADMIN: 'Admin',
       ARCHITECT: 'Arquitecto',
@@ -332,6 +359,7 @@ export class SupabaseDataService {
       const team = employeeTeams[0];
       return {
         id: employee.employee_code ?? employee.id,
+        employeeId: employee.id,
         name: employee.full_name,
         role: role ? (legacyRoles[role.code] ?? role.name) : null,
         email: employee.email,
@@ -398,6 +426,7 @@ export class SupabaseDataService {
       return [
         {
           id: employee.employee_code ?? employee.id,
+          employeeId: employee.id,
           name: employee.full_name,
           role: null,
           email: employee.email,
@@ -424,8 +453,6 @@ export class SupabaseDataService {
       'Scrum Master': 'SCRUM_MASTER',
       'Ingeniero de Software': 'SOFTWARE_ENGINEER',
       'Ingeniero de QA': 'QA_ENGINEER',
-      'Creador de Bienestar': 'WELLBEING_CREATOR',
-      Pasante: 'INTERN',
     };
     const roleCode = roleCodes[data.role];
     if (!roleCode) throw new Error(`Unsupported personnel role: ${data.role}`);
@@ -445,16 +472,29 @@ export class SupabaseDataService {
     return { id: String(id) };
   }
 
-  async updatePersonnel(personnelId: string, data: UpdatePersonnelData) {
+  async updatePersonnel(
+    personnelId: string,
+    data: UpdatePersonnelData,
+    options: { allowHistoricalRoles?: boolean } = {},
+  ) {
     const roleCodes: Record<string, string> = {
       Admin: 'ADMIN',
       Arquitecto: 'ARCHITECT',
       'Scrum Master': 'SCRUM_MASTER',
       'Ingeniero de Software': 'SOFTWARE_ENGINEER',
       'Ingeniero de QA': 'QA_ENGINEER',
-      'Creador de Bienestar': 'WELLBEING_CREATOR',
-      Pasante: 'INTERN',
     };
+    // Los roles retirados solo se admiten para restauraciones internas.
+    if (options.allowHistoricalRoles) {
+      const historicalRoleCodes: Record<
+        string,
+        (typeof HISTORICAL_ROLE_CODES)[number]
+      > = {
+        Pasante: 'INTERN',
+        'Creador de Bienestar': 'WELLBEING_CREATOR',
+      };
+      Object.assign(roleCodes, historicalRoleCodes);
+    }
     const payload: Record<string, unknown> = { employeeId: personnelId };
     if (data.name !== undefined) payload.fullName = data.name;
     if (data.email !== undefined) payload.email = data.email;
@@ -594,6 +634,7 @@ export class SupabaseDataService {
       start_date: row.start_date,
       end_date: row.end_date,
       sprint_closed: row.status === 'completed',
+      status: row.status,
     };
   }
 

@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +16,9 @@ import {
   ApiParam,
   ApiQuery,
   ApiTags,
+  ApiOkResponse,
 } from '@nestjs/swagger';
+import { ReplaceTeamLeaderDto } from '../dto/team-leader.dto';
 import { OrganizationService } from '../services/organization.service';
 import { AuthGuard } from '../../auth/auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
@@ -95,6 +98,42 @@ export class OrganizationController {
     @Body() input: UpdateProjectDto,
   ) {
     return this.service.updateProject(projectId, input);
+  }
+
+  @Get('team-leaders')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiOperation({ summary: 'Listar líderes de todos los equipos' })
+  @ApiOkResponse({ description: 'Equipos con su arquitecto y Scrum Master' })
+  findTeamLeaders() {
+    return this.service.findAllTeamLeaders();
+  }
+
+  @Get('leader-candidates')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiOperation({ summary: 'Listar candidatos con rol vigente de líder' })
+  @ApiOkResponse({ description: 'Arquitectos y Scrum Masters activos' })
+  findLeaderCandidates() {
+    return this.service.findLeaderCandidates();
+  }
+
+  @Put('teams/:teamId/leaders/:role')
+  @UseGuards(AuthGuard, AdminGuard)
+  @ApiOperation({
+    summary: 'Reemplazar un líder del equipo y actualizar sprints planificados',
+  })
+  @ApiParam({ name: 'teamId', format: 'uuid' })
+  @ApiParam({ name: 'role', enum: ['architect', 'scrum-master'] })
+  @ApiOkResponse({
+    description:
+      'Conteos de asignaciones finalizadas, creadas y sprints actualizados',
+  })
+  replaceTeamLeader(
+    @Param('teamId', new ParseUUIDPipe()) teamId: string,
+    @Param('role') role: string,
+    @Body() input: ReplaceTeamLeaderDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.service.replaceTeamLeader(teamId, role, input, currentUser);
   }
 
   @Get('teams')

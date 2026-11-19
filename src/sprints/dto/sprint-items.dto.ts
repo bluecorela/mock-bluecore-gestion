@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { OmitType, PartialType } from '@nestjs/mapped-types';
 import {
   IsDateString,
   IsIn,
@@ -8,6 +8,7 @@ import {
   IsUUID,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateSprintInitiativeDto {
@@ -45,8 +46,13 @@ export class CreateSprintUserStoryDto {
   @IsOptional() @IsUUID() assignedEmployeeId?: string;
 }
 export class UpdateSprintUserStoryDto extends PartialType(
-  CreateSprintUserStoryDto,
-) {}
+  OmitType(CreateSprintUserStoryDto, ['code'] as const),
+) {
+  @ValidateIf((_object, value: unknown) => value !== undefined)
+  @IsString()
+  @MaxLength(60)
+  code?: string;
+}
 
 export class MoveSprintUserStoryDto {
   @IsUUID()

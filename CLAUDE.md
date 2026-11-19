@@ -1,90 +1,172 @@
-# CLAUDE.md
+# mock-bluecore-gestion — API
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+API del portal interno de Bluecore: organización, personal, equipos, sprints e
+historias de usuario (HU), evaluaciones, rotaciones y reportes semanales.
+Persiste en Supabase/PostgreSQL y autentica con Supabase Auth.
+Frontend consumidor: `../bluecore-gestion/CLAUDE.md`.
 
-## Commands
+## Requisitos y comandos
+
+Usar **Node 22 con nvm** (`.nvmrc`). Los scripts disponibles están en `package.json`.
 
 ```bash
-# Development
-npm run start:dev       # Watch mode (hot reload)
-npm run start:debug     # Debug + watch mode
-
-# Build & Production
-npm run build           # Compile TypeScript via nest build
-npm run start:prod      # Run compiled output from dist/
-
-# Testing
-npm run test            # Run all unit tests
-npm run test:watch      # Watch mode
-npm run test:cov        # With coverage
-npm run test:e2e        # End-to-end tests
-jest src/path/to/file.spec.ts   # Run a single test file
-
-# Code Quality
-npm run lint            # ESLint with auto-fix
-npm run format          # Prettier format
+nvm use
+npm install
+npm run start              # desarrollo
+npm run start:dev          # desarrollo con watch, sin preparar ni sembrar base
+npm run start:debug        # debug y watch
+npm run start:test         # API con entorno test
+npm run build             # Nest → dist/
+npm run start:prod         # NODE_ENV=production node dist/main
+npm run lint              # ESLint con --fix: modifica archivos
+npm run format            # Prettier sobre src/ y test/
+npm test
+npm run test:watch
+npm run test:cov
+npm run test:debug
+npm run test:e2e
+npm run supabase:check
+npm run supabase:migrations:status
+npm run supabase:migrations:apply
+npm run supabase:v2:migrate # utilidad histórica de migración, revisar antes de usar
 ```
 
-## Architecture
+## Stack y arranque
 
-NestJS backend API serving an Angular frontend (localhost:4200). All routes are prefixed with `/api`. Swagger docs available at `/api/docs`.
+- NestJS 11 sobre Express, TypeScript 5, RxJS 7; Supabase JS 2 y PostgreSQL.
+- SDK de Model Context Protocol, Zod; class-validator y class-transformer.
+- Swagger/OpenAPI, Helmet, throttler; Jest 30, ts-jest y Supertest.
+- Configuración: `package.json`, `tsconfig.json`, `eslint.config.mjs`, `.prettierrc`.
 
-### Firebase Integration
+`src/main.ts` configura prefijo `/api`, CORS, Helmet, identificador de petición,
+validación global y Swagger en `/api/docs` cuando está habilitado. CORS admite
+GET/POST/PATCH/PUT/DELETE/OPTIONS. La validación transforma DTOs, elimina campos
+fuera de whitelist y rechaza propiedades no declaradas.
+`/mcp` y las rutas de descubrimiento `.well-known/oauth-protected-resource`
+quedan fuera del prefijo. `src/config/body-parser.ts` configura límites de cuerpos.
+`src/app.module.ts` registra guardias globales de throttling y acceso al portal,
+y `src/observability/request-logging.interceptor.ts` registra las peticiones.
 
-The central `FirebaseClient` (`src/firebase/firebase.client.ts`) is the sole Firestore interface. It authenticates using email/password credentials from env vars (`FIREBASE_EMAIL`, `FIREBASE_PASSWORD`) and calls `await this.login()` at the start of every data method. All modules inject `FirebaseClient` from `FirebaseClientModule`.
+## Módulos y estructura
 
-**Required `.env` variables:**
+Los módulos se registran en `src/app.module.ts`; los controllers definen rutas y
+permisos, los services orquestan reglas y los repositorios encapsulan consultas.
+
+| Directorio en src/ | Responsabilidad |
+| --- | --- |
+| `auth/` | Sesiones, usuarios Auth, contraseña, roles y guards |
+| `user-admin/` | Altas, cambios de rol, movimientos y designación de líderes con vista previa |
+| `supabase/` | Clientes, fachada de datos y repositorios de directorio/navegación |
+| `organization/` | Clientes, proyectos, membresías, líderes y acceso a equipos |
+| `sprints/` | Ciclo de sprint, HU, iniciativas, métricas, mappers y repositorios |
+| `sprints/load/` | Planificación, confirmación de cargas y actualización de HU por código |
+| `weekly-dashboard/` | Contexto, reportes semanales y repositorio |
+| `teams/`, `personnel/` | API compatible de equipos, evaluaciones y personal |
+| `rotation/`, `rotation-history/` | Vacaciones, reemplazos, movimientos e historial |
+| `performance/`, `oto/` | Evaluaciones de desempeño y One to One |
+| `operations/` | Cálculos de rendimiento |
+| `sidebar-modules/`, `maintenance/` | Navegación por rol y estado de mantenimiento |
+| `health/`, `observability/` | Salud y registro de peticiones |
+| `mcp/` | Transporte HTTP, autenticación, herramientas y vistas previas |
+
+Se conservan rutas como `/api/equipos`, `/api/personal`, `/api/rotacion` y
+`/api/rotacion-historial`. Las rutas operativas nuevas usan `/api/v2`, incluidos
+`/api/v2/teams/:teamId/sprints` y `/api/v2/admin`.
+Revisar los controllers al cambiar contratos y coordinar los consumidores del front.
+
+## Autenticación y permisos
+
+- `src/auth/auth.service.ts` inicia sesión con Supabase Auth y valida el Bearer
+  mediante `auth.getUser`; carga identidad, empleado y rol desde los datos del portal.
+- `src/auth/portal-access.guard.ts` protege globalmente las rutas, salvo las
+  marcadas públicas. Acceso al portal: Admin, Arquitecto y Scrum Master.
+  `AnyAuthenticatedRole` permite excepciones para usuarios autenticados de otros roles.
+- `src/auth/auth.constants.ts` define también Ingeniero de Software e Ingeniero
+  de QA; los códigos históricos WELLBEING_CREATOR e INTERN no son roles asignables.
+- `AuthGuard`, `RolesGuard`, `AdminGuard` y los decoradores de `src/auth/`
+  completan la autorización por endpoint. No basta con ocultar opciones del menú.
+- `src/organization/services/organization.service.ts` comprueba acceso y liderazgo
+  vigente mediante `assertTeamAccess` y `assertTeamLeader`; Admin tiene excepción.
+  La designación del líder se consulta en base, no se deduce de claims de equipos.
+- En `src/sprints/controllers/sprints.controller.ts`, crear, iniciar, completar
+  y eliminar exigen Admin o Arquitecto designado; editar permite también al SM
+  designado. Las lecturas comprueban acceso al equipo.
+- `src/user-admin/user-admin.controller.ts` exige Admin y ofrece preview/aplicación
+  para altas, rol, movimiento y designación de líderes.
+- MCP usa guards propios (`src/mcp/mcp-auth.guard.ts`, `mcp-throttler.guard.ts`),
+  OAuth de Supabase y límite por usuario. Los tokens de clientes OAuth se restringen
+  a MCP; las llamadas internas confiables pasan por `src/auth/internal-call.service.ts`.
+  Las herramientas viven en `src/mcp/tools/`; las de usuarios se registran para Admin.
+
+## Acceso a datos y reglas de sprint
+
+`src/supabase/supabase.client.ts` crea un cliente privilegiado para backend:
+`getV2Client()` selecciona el esquema normalizado `bluecore_v2`; `getClient()`
+se usa para Auth y `getPublicClient()` para flujos con clave anónima.
+Nunca enviar la service-role key al navegador.
+
+`src/supabase/supabase-data.service.ts` es la fachada compartida de datos.
+Los repositorios de `organization/`, `sprints/`, `weekly-dashboard/`, `user-admin/`
+y `src/supabase/repositories/` realizan consultas y llamadas RPC. Mantener las
+operaciones atómicas en las RPC, sin sustituirlas por escrituras parciales desde HTTP.
+
+- El ciclo operativo usa estados `planned`, `in_progress`, `completed` y RPC
+  como `start_sprint` y `complete_sprint` (repositorio de sprints).
+- Completar mueve las HU pendientes al siguiente sprint; los códigos HU son
+  únicos globalmente tras normalización (restricción en base).
+- Eliminar exige sprint planificado sin HU ni dependencias; reserva su numeración
+  para evitar reutilizarla.
+- Los errores estables se definen en `src/sprints/sprint-error-codes.ts`:
+  preservan `code`, estado HTTP y mensaje; traducen errores RPC P0001 por `details`.
+  `src/sprints/sprint-error-message.ts` cubre mensajes heredados. Mantener el contrato
+  al cambiar los mensajes de las RPC.
+- Cargas de HU y actualizaciones por código tienen preview y confirmación;
+  `src/sprints/load/load-confirmation.service.ts` firma operación, usuario, destino
+  y contenido con HMAC-SHA256, con vencimiento de diez minutos. Revalidar al aplicar;
+  la base registra el consumo para impedir reutilización.
+
+## Migraciones
+
+El aplicador `scripts/apply-database-migrations.js` requiere conexión PostgreSQL
+por `SUPABASE_DB_URL`; no es la URL HTTP de Supabase. Ejecutar primero status,
+revisar pendientes y luego apply contra el destino elegido.
+
+- Lee `scripts/migrations/` por nombre ordenado y registra SHA-256 en
+  `bluecore_v2.schema_migrations` con advisory lock.
+- Rechaza checksums cambiados: **no editar migraciones aplicadas**; agregar otra.
+- El runner lee `.env` y `.env.<NODE_ENV>`; no carga los `.local` como la API.
+- `scripts/check-supabase-connection.js` verifica conexión, conteos, contrato RPC
+  e invariantes.
+- Los SQL históricos de creación/importación no bastan para reproducir una base actual.
+
+## Variables de entorno
+
+Nombres de las plantillas `.env.example`, `.env.development.example`,
+`.env.test.example` y `.env.production.example`, más `SUPABASE_DB_URL` del aplicador:
+
+```text
+NODE_ENV PORT API_PORT CORS_ORIGINS SWAGGER_ENABLED
+SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY SUPABASE_ANON_KEY SUPABASE_V2_SCHEMA
+AUTH_EMAIL_PROVIDER FRONTEND_URL PUBLIC_API_URL LOAD_CONFIRMATION_SECRET
+SUPABASE_DB_URL
 ```
-FIREBASE_API_KEY
-FIREBASE_AUTH_DOMAIN
-FIREBASE_PROJECT_ID
-FIREBASE_STORAGE_BUCKET
-FIREBASE_APP_ID
-FIREBASE_EMAIL
-FIREBASE_PASSWORD
-PORT  # defaults to 3000
-```
 
-### Firestore Data Model
+`src/config/environment.ts` valida la configuración. Precedencia API: entorno del
+proceso, `.env.<NODE_ENV>.local`, `.env.<NODE_ENV>`, `.env`.
+En producción exige configuración de CORS, front, URL pública y secreto de
+confirmación; este último debe tener al menos 32 caracteres y compartirse entre
+instancias. Fuera de producción, si falta, se genera uno temporal por instancia.
 
-```
-personal/                         # Team members (correo, rol, equipo ref, vacaciones)
-equipos/                          # Teams
-  {equipoId}/sprints/             # Sprints per team
-    {sprintId}/Integrantes/       # Sprint evaluations per member
-  {equipoId}/evaluaciones/
-    perfomance/performance-{n}/   # Performance evaluations (note: typo "perfomance")
-    one-to-one/oto-{n}/          # One-to-one evaluations
-historialRotaciones/              # Rotation history log
-modulosSidebar/                   # Sidebar modules with rolesPermitidos[]
-config_evaluaciones/
-  performance                     # Performance eval questions config
-  one-to-one                      # OTO eval questions config
-habilitaciones_desempeno/         # Performance enablement tracking per team
-settings/maintenance              # Maintenance mode flag
-```
+## Convenciones, tests y precauciones
 
-### Module Overview
-
-| Module | Route prefix | Purpose |
-|--------|-------------|---------|
-| `personal` | `/api/personal` | CRUD for team members |
-| `equipos` | `/api/equipos` | CRUD for teams, sprint status |
-| `rotacion-historial` | `/api/historial-rotaciones` | Rotation history |
-| `rotacion` | `/api/rotacion` | Rotation operations |
-| `operaciones` | `/api/operaciones` | Pure calculation logic (no Firestore) for sprint performance metrics |
-| `administracion-datos` | `/api/administracion-datos` | Sprint evaluation saving |
-| `oto` | `/api/oto` | One-to-one evaluations |
-| `performance` | `/api/performance` | Performance evaluations and enablement |
-| `modulos-sidebar` | `/api/modulos-sidebar` | Sidebar navigation by role |
-| `maintenance` | `/api/maintenance` | Maintenance mode status |
-
-### Key Business Rules
-
-- Sprint IDs follow the pattern `sprint-{number}` (e.g., `sprint-1`, `sprint-12`)
-- Sprints auto-close (`sprint_cerrado: true`) when all eligible members are evaluated
-- Members excluded from sprint evaluation: `rol === 'arquitecto'`, `vacaciones === true`
-- Members with `inicioReemplazoSprintId` are only eligible starting from that sprint number
-- Equipo IDs are generated as slugs: normalized, lowercased, spaces replaced with `-`
-- CORS is restricted to `http://localhost:4200` only
-- `ValidationPipe` is global with `whitelist: true` and `forbidNonWhitelisted: true`
+- Dominio en español; archivos kebab-case, clases PascalCase y sufijos Nest.
+  DTOs con class-validator y metadatos Swagger; imports relativos.
+- `tsconfig.json`: NodeNext, ES2023, strictNullChecks, noImplicitAny desactivado.
+  `.prettierrc`: comillas simples y coma final.
+- Specs unitarios en `src/**/*.spec.ts`: servicios, guards, DTOs, mappers,
+  repositorios y MCP; simular dependencias mediante inyección de Nest.
+- `test/app.e2e-spec.ts` instancia AppModule y prueba `/` sin el bootstrap de
+  `main.ts`; no equivale a probar prefijo, CORS y validación del servidor real.
+- No usar credenciales de producción en desarrollo o tests. No ejecutar seeds,
+  importaciones históricas, limpiezas ni migraciones remotas sin revisar destino,
+  respaldo y autorización. Ensayar primero sobre una copia local desechable.

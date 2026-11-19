@@ -15,7 +15,8 @@ describe('AuthService', () => {
     user_metadata: { mustChangePassword: true },
   };
   const personnel = {
-    id: 'employee-id',
+    id: 'px4vN55npYtPR3YnEERp',
+    employeeId: '11111111-1111-4111-8111-111111111111',
     name: 'Ana Pérez',
     email: authUser.email,
     role: 'Arquitecto',
@@ -58,6 +59,77 @@ describe('AuthService', () => {
     });
   });
 
+  describe('tokens de clientes OAuth', () => {
+    function token(payload: Record<string, unknown>) {
+      return `cabecera.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.firma`;
+    }
+
+    beforeEach(() => {
+      jest
+        .spyOn(dataService, 'getPersonnelByAuthUserId')
+        .mockResolvedValue(personnel);
+    });
+
+    it('rechaza el token de IA por defecto', async () => {
+      const jwt = token({ client_id: 'abc' });
+      await expect(
+        service.validateAuthorizationHeader(`Bearer ${jwt}`),
+      ).rejects.toThrow(
+        new UnauthorizedException('Este acceso de IA solo sirve en /mcp'),
+      );
+      expect(authApi.getUser).toHaveBeenCalledWith(jwt);
+    });
+
+    it('acepta el token de IA con permiso explícito', async () => {
+      await expect(
+        service.validateAuthorizationHeader(
+          `Bearer ${token({ client_id: 'abc' })}`,
+          {
+            allowOAuthClient: true,
+          },
+        ),
+      ).resolves.toMatchObject({ oauthClientId: 'abc' });
+    });
+
+    it('rechaza un payload no JSON incluso si Supabase acepta el token', async () => {
+      await expect(
+        service.validateAccessToken('cabecera.bm8tZXMtanNvbg.firma'),
+      ).rejects.toThrow(
+        new UnauthorizedException('Token de Supabase inválido o expirado'),
+      );
+      expect(dataService.getPersonnelByAuthUserId).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])(
+      'acepta una sesión normal con permiso %s',
+      async (allowOAuthClient) => {
+        await expect(
+          service.validateAuthorizationHeader(
+            `Bearer ${token({ sub: authUser.id })}`,
+            {
+              allowOAuthClient,
+            },
+          ),
+        ).resolves.toMatchObject({ oauthClientId: null });
+      },
+    );
+
+    it('no acepta un token OAuth rechazado por Supabase aunque tenga permiso', async () => {
+      authApi.getUser.mockResolvedValue({
+        data: { user: null },
+        error: new Error('Token inválido'),
+      });
+      await expect(
+        service.validateAuthorizationHeader(
+          `Bearer ${token({ client_id: 'abc' })}`,
+          {
+            allowOAuthClient: true,
+          },
+        ),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+  });
+
   it('resolves the profile using the Supabase Auth user ID', async () => {
     jest
       .spyOn(dataService, 'getPersonnelByAuthUserId')
@@ -66,6 +138,7 @@ describe('AuthService', () => {
     await expect(service.validateAccessToken('token')).resolves.toMatchObject({
       supabaseUserId: authUser.id,
       personnelId: personnel.id,
+      employeeId: personnel.employeeId,
       role: 'Arquitecto',
       mustChangePassword: true,
     });
@@ -160,11 +233,14 @@ describe('AuthService', () => {
     await expect(
       service.getBootstrap({
         supabaseUserId: authUser.id,
+        oauthClientId: null,
         email: authUser.email,
         personnelId: personnel.id,
+        employeeId: personnel.employeeId,
         name: personnel.name,
         role: personnel.role,
         teamId: null,
+        teamIds: [],
         mustChangePassword: false,
       }),
     ).resolves.toMatchObject({
@@ -249,8 +325,67 @@ describe('AuthService', () => {
     expect(dataService.updatePersonnel).toHaveBeenLastCalledWith(
       personnel.id,
       expect.objectContaining({ name: personnel.name }),
+      { allowHistoricalRoles: true },
     );
   });
+
+  it.each([
+    ['Pasante', true],
+    ['Creador de Bienestar', true],
+    ['Pasante', false],
+    ['Creador de Bienestar', false],
+  ] as const)(
+    'restaura el rol histórico %s al fallar Auth (cuenta existente: %s)',
+    async (role, hasAuthAccess) => {
+      const historicalPersonnel = { ...personnel, role };
+      const authError = new BadRequestException('Auth no disponible');
+      jest
+        .spyOn(dataService, 'getPersonnelById')
+        .mockResolvedValue(historicalPersonnel);
+      jest
+        .spyOn(dataService, 'updatePersonnel')
+        .mockResolvedValueOnce({
+          ...personnel,
+          role: 'Ingeniero de QA',
+          teamId: 'equipo-qa',
+        })
+        .mockResolvedValueOnce(historicalPersonnel);
+      jest
+        .spyOn(dataService, 'getPersonnelAuthUserId')
+        .mockResolvedValue(hasAuthAccess ? authUser.id : null);
+      authApi.admin.getUserById.mockResolvedValue({
+        data: { user: authUser },
+        error: null,
+      });
+      authApi.admin.listUsers.mockResolvedValue({
+        data: { users: [] },
+        error: null,
+      });
+      const authWrite = hasAuthAccess
+        ? authApi.admin.updateUserById
+        : authApi.admin.createUser;
+      authWrite.mockRejectedValueOnce(authError);
+
+      await expect(
+        service.updateUser(personnel.id, {
+          role: 'Ingeniero de QA',
+          teamId: 'equipo-qa',
+          password: 'Temporal123!',
+        }),
+      ).rejects.toBe(authError);
+      expect(dataService.updatePersonnel).toHaveBeenNthCalledWith(
+        1,
+        personnel.id,
+        expect.objectContaining({ role: 'Ingeniero de QA' }),
+      );
+      expect(dataService.updatePersonnel).toHaveBeenNthCalledWith(
+        2,
+        personnel.id,
+        expect.objectContaining({ role, teamId: null }),
+        { allowHistoricalRoles: true },
+      );
+    },
+  );
 
   it('changes the password before clearing the initial-change flag', async () => {
     authApi.admin.getUserById.mockResolvedValue({
@@ -312,6 +447,40 @@ describe('AuthService', () => {
     expect(dataService.linkPersonnelToAuthUser).toHaveBeenCalledWith(
       personnel.id,
       'new-auth-user-id',
+    );
+  });
+  it('propaga createdBy interno al alta de personal sin exponerlo en Auth', async () => {
+    const createPersonnel = jest
+      .fn()
+      .mockResolvedValue({ id: 'new-personnel' });
+    const creationData = {
+      getPersonnelByEmail: jest.fn().mockResolvedValue(null),
+      createPersonnel,
+    };
+    const creationService = new AuthService(
+      supabaseClient,
+      creationData as unknown as SupabaseDataService,
+    );
+    authApi.admin.createUser.mockResolvedValue({
+      data: { user: authUser },
+      error: null,
+    });
+    await creationService.createUser({
+      name: 'Ana',
+      email: authUser.email,
+      role: 'Arquitecto',
+      password: 'ClaveTemporal123!',
+      sendPasswordEmail: false,
+      createdBy: 'admin-id',
+    });
+    expect(createPersonnel).toHaveBeenCalledWith(
+      expect.objectContaining({
+        createdBy: 'admin-id',
+        authUserId: authUser.id,
+      }),
+    );
+    expect(authApi.admin.createUser.mock.calls.at(-1)![0]).not.toHaveProperty(
+      'createdBy',
     );
   });
 });

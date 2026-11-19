@@ -1,3 +1,4 @@
+import { OrganizationRepository } from '../organization/repositories/organization.repository';
 import { Module } from '@nestjs/common';
 import { SupabaseClient } from './supabase.client';
 import { SupabaseDataService } from './supabase-data.service';
@@ -7,10 +8,11 @@ import { NavigationRepository } from './repositories/navigation.repository';
 @Module({
   providers: [
     SupabaseClient,
+    OrganizationRepository,
     TeamDirectoryRepository,
     NavigationRepository,
     SupabaseDataService,
   ],
-  exports: [SupabaseClient, SupabaseDataService],
+  exports: [SupabaseClient, SupabaseDataService, OrganizationRepository],
 })
 export class SupabaseModule {}

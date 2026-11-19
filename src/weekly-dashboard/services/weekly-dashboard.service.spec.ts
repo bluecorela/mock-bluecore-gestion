@@ -140,6 +140,7 @@ describe('WeeklyDashboardService', () => {
 
   it('builds the selected week context with active assignments and matching sprints', async () => {
     const organization: TeamOrganization = {
+      leaders: { architect: null, scrumMaster: null },
       team: {
         id: 'team-id',
         code: 'team-code',
