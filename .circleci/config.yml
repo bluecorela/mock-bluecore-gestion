@@ -7,6 +7,40 @@ orbs:
   replace: bluecorelatemp/replace@0.0.2
 
 jobs:
+  build-check:
+    docker:
+      - image: cimg/node:22.14
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies and compile NestJS
+          command: |
+            npm ci --include=dev
+            npm run build
+      - setup_remote_docker
+      - run:
+          name: Build Docker image
+          command: docker build --platform linux/amd64 -f .circleci/Dockerfile -t mgmt-back:check .
+
+  plan-terraform:
+    docker:
+      - image: hashicorp/terraform:latest
+    steps:
+      - checkout
+      - run:
+          name: Install Python, AWS CLI, and jq
+          command: apk add --no-cache python3 aws-cli jq
+      - aws-cli/setup:
+          role_arn: ${OIDC_ROL_ARN}
+      - aws-ecr/get-latest-tag:
+          repo_name: "mgmt-back"
+      - replace/replace:
+          files: ".circleci/iac/prod.auto.tfvars"
+      - terraform/init:
+          path: .circleci/iac
+      - terraform/plan:
+          path: .circleci/iac
+
   deploy-terraform:
     docker:
       - image: hashicorp/terraform:latest
@@ -60,12 +94,31 @@ workflows:
           context:
             - aws
             - gestion
-          # filters:
-          #   branches:
-          #     only: dev
+          filters:
+            branches:
+              only: main
       - deploy-terraform:
           context:
             - aws
             - gestion
           requires:
             - build-and-push
+          filters:
+            branches:
+              only: main
+      - build-check:
+          context:
+            - aws
+            - gestion
+          filters:
+            branches:
+              ignore: main
+      - plan-terraform:
+          context:
+            - aws
+            - gestion
+          requires:
+            - build-check
+          filters:
+            branches:
+              ignore: main

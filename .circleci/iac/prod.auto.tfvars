@@ -52,4 +52,6 @@ app_env = {
   cors_origins              = "{CORS_ORIGINS}"
   frontend_url              = "{FRONTEND_URL}"
   swagger_enabled           = "{SWAGGER_ENABLED}"
+  load_confirmation_secret  = "{LOAD_CONFIRMATION_SECRET}"
+  public_api_url            = "{PUBLIC_API_URL}"
 }

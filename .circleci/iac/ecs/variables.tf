@@ -59,6 +59,7 @@ variable "tags" {
 }
 
 variable "app_env" {
+  sensitive   = true
   description = "Environment variables injected into the application container."
   type = object({
     node_env                  = string
@@ -72,5 +73,7 @@ variable "app_env" {
     cors_origins              = string
     frontend_url              = string
     swagger_enabled           = string
+    load_confirmation_secret  = string
+    public_api_url            = string
   })
 }

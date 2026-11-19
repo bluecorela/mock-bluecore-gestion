@@ -71,7 +71,9 @@ resource "aws_ecs_task_definition" "web" {
         { name = "AUTH_EMAIL_PROVIDER", value = var.app_env.auth_email_provider },
         { name = "CORS_ORIGINS", value = var.app_env.cors_origins },
         { name = "FRONTEND_URL", value = var.app_env.frontend_url },
-        { name = "SWAGGER_ENABLED", value = var.app_env.swagger_enabled }
+        { name = "SWAGGER_ENABLED", value = var.app_env.swagger_enabled },
+        { name = "LOAD_CONFIRMATION_SECRET", value = var.app_env.load_confirmation_secret },
+        { name = "PUBLIC_API_URL", value = var.app_env.public_api_url }
       ]
       logConfiguration = {
         logDriver = "awslogs"
