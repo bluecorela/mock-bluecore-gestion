@@ -1,3 +1,5 @@
+import { ConfigService } from '@nestjs/config';
+
 export type ApplicationEnvironment = 'development' | 'test' | 'production';
 
 const environments: ApplicationEnvironment[] = [
@@ -97,5 +99,25 @@ export function validateEnvironment(
   }
   config.PUBLIC_API_URL = String(config.PUBLIC_API_URL).replace(/\/+$/, '');
 
+  for (const name of ['MCP_ENABLED', 'LOG_FORWARDED_FOR']) {
+    const value = config[name] === undefined ? 'false' : config[name];
+    if (value !== 'true' && value !== 'false') {
+      throw new Error(`${name} debe ser 'true' o 'false'`);
+    }
+    config[name] = value;
+  }
+
+  const proxy =
+    config.TRUST_PROXY === undefined ? '0' : String(config.TRUST_PROXY);
+  const hops = Number(proxy);
+  if (!/^\d+$/.test(proxy) || !Number.isSafeInteger(hops)) {
+    throw new Error('TRUST_PROXY debe ser un entero mayor o igual a 0');
+  }
+  config.TRUST_PROXY = hops;
+
   return config;
+}
+
+export function trustProxyHops(config: ConfigService): number {
+  return config.get<number>('TRUST_PROXY', 0);
 }

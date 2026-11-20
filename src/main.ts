@@ -1,24 +1,39 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { configureBodyParsers } from './config/body-parser';
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
+import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import helmet from 'helmet';
+import { trustProxyHops } from './config/environment';
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 
-async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+export function configureApplication(app: NestExpressApplication): void {
   const configService = app.get(ConfigService);
-  app.enableShutdownHooks();
+  const hops = trustProxyHops(configService);
+  if (hops > 0) app.set('trust proxy', hops);
+  const logForwardedFor =
+    configService.get<string>('LOG_FORWARDED_FOR') === 'true';
+  const logger = new Logger('HTTP');
 
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use((request: Request, response: Response, next: NextFunction) => {
     const requestId = request.header('x-request-id') || randomUUID();
     request.headers['x-request-id'] = requestId;
     response.setHeader('x-request-id', requestId);
+    // shortcut: log temporal para fijar TRUST_PROXY, borrar tras el release
+    if (logForwardedFor) {
+      logger.log(
+        JSON.stringify({
+          requestId,
+          path: request.path,
+          xForwardedFor: request.header('x-forwarded-for') ?? null,
+          ip: request.ip,
+          socketIp: request.socket.remoteAddress,
+        }),
+      );
+    }
     next();
   });
 
@@ -89,8 +104,15 @@ async function bootstrap() {
       },
     });
   }
+}
 
+async function bootstrap() {
+  const { AppModule } = await import('./app.module.js');
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  app.enableShutdownHooks();
+  configureApplication(app);
+  const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 3000);
   await app.listen(port, '0.0.0.0');
 }
-void bootstrap();
+if (require.main === module) void bootstrap();

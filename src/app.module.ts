@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PersonnelModule } from './personnel/personnel.module';
@@ -58,7 +58,10 @@ import { UserAdminModule } from './user-admin/user-admin.module';
     WeeklyDashboardModule,
     SprintsModule,
     HealthModule,
-    McpModule,
+    ConditionalModule.registerWhen(
+      McpModule,
+      (env) => env.MCP_ENABLED === 'true',
+    ),
     UserAdminModule,
   ],
   controllers: [AppController],
