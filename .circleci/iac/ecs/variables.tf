@@ -75,5 +75,8 @@ variable "app_env" {
     swagger_enabled           = string
     load_confirmation_secret  = string
     public_api_url            = string
+    mcp_enabled               = string
+    trust_proxy               = string
+    log_forwarded_for         = string
   })
 }
