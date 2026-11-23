@@ -99,12 +99,24 @@ export function validateEnvironment(
   }
   config.PUBLIC_API_URL = String(config.PUBLIC_API_URL).replace(/\/+$/, '');
 
-  for (const name of ['MCP_ENABLED', 'LOG_FORWARDED_FOR']) {
+  for (const name of [
+    'MCP_ENABLED',
+    'LOG_FORWARDED_FOR',
+    'APP_CHECK_ENFORCED',
+  ]) {
     const value = config[name] === undefined ? 'false' : config[name];
     if (value !== 'true' && value !== 'false') {
       throw new Error(`${name} debe ser 'true' o 'false'`);
     }
     config[name] = value;
+  }
+
+  config.FIREBASE_PROJECT_ID =
+    String(config.FIREBASE_PROJECT_ID ?? '').trim() || undefined;
+  if (config.APP_CHECK_ENFORCED === 'true' && !config.FIREBASE_PROJECT_ID) {
+    throw new Error(
+      'FIREBASE_PROJECT_ID es obligatoria si APP_CHECK_ENFORCED=true',
+    );
   }
 
   const proxy =

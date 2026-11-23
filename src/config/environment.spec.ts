@@ -238,3 +238,42 @@ describe('interruptor MCP y proxies', () => {
     );
   });
 });
+
+describe('App Check', () => {
+  const base = {
+    NODE_ENV: 'test',
+    SUPABASE_URL: 'http://supabase.test',
+    SUPABASE_SERVICE_ROLE_KEY: 'secret',
+  };
+
+  it('APP_CHECK_ENFORCED usa false si falta', () => {
+    expect(validateEnvironment(base).APP_CHECK_ENFORCED).toBe('false');
+  });
+
+  it.each(['{APP_CHECK_ENFORCED}', '1', 'yes', '', 'TRUE', true, null])(
+    'APP_CHECK_ENFORCED=%p aborta',
+    (APP_CHECK_ENFORCED) => {
+      expect(() =>
+        validateEnvironment({ ...base, APP_CHECK_ENFORCED }),
+      ).toThrow('APP_CHECK_ENFORCED');
+    },
+  );
+
+  it('con true exige FIREBASE_PROJECT_ID', () => {
+    const enabled = { ...base, APP_CHECK_ENFORCED: 'true' };
+    expect(() => validateEnvironment(enabled)).toThrow('FIREBASE_PROJECT_ID');
+    expect(() =>
+      validateEnvironment({ ...enabled, FIREBASE_PROJECT_ID: '  ' }),
+    ).toThrow('FIREBASE_PROJECT_ID');
+  });
+
+  it('con true y proyecto, lo conserva', () => {
+    expect(
+      validateEnvironment({
+        ...base,
+        APP_CHECK_ENFORCED: 'true',
+        FIREBASE_PROJECT_ID: ' bluecore-portal-gestion-prod ',
+      }).FIREBASE_PROJECT_ID,
+    ).toBe('bluecore-portal-gestion-prod');
+  });
+});
