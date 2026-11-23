@@ -9,3 +9,6 @@ export const AnyAuthenticatedRole = () =>
 
 export const OAUTH_CLIENT_ROUTE_KEY = 'oauthClientRoute';
 export const OAuthClientRoute = () => SetMetadata(OAUTH_CLIENT_ROUTE_KEY, true);
+
+export const SKIP_APP_CHECK_KEY = 'skipAppCheck';
+export const SkipAppCheck = () => SetMetadata(SKIP_APP_CHECK_KEY, true);

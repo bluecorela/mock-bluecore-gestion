@@ -13,6 +13,7 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
+import { AppCheckGuard } from './auth/app-check.guard';
 import { PortalAccessGuard } from './auth/portal-access.guard';
 import { OrganizationModule } from './organization/organization.module';
 import { WeeklyDashboardModule } from './weekly-dashboard/weekly-dashboard.module';
@@ -70,6 +71,10 @@ import { UserAdminModule } from './user-admin/user-admin.module';
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AppCheckGuard,
     },
     {
       provide: APP_GUARD,
