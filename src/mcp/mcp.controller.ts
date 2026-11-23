@@ -13,7 +13,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Response } from 'express';
-import { OAuthClientRoute, PublicRoute } from '../auth/access.decorators';
+import {
+  OAuthClientRoute,
+  PublicRoute,
+  SkipAppCheck,
+} from '../auth/access.decorators';
 import type { AuthenticatedRequest } from '../auth/auth.guard';
 import { InternalCallService } from '../auth/internal-call.service';
 import { InternalApi } from './internal-api';
@@ -22,6 +26,7 @@ import { createServer } from './mcp-server.factory';
 import { McpAuthGuard } from './mcp-auth.guard';
 import { McpThrottlerGuard } from './mcp-throttler.guard';
 
+@SkipAppCheck()
 @PublicRoute()
 @OAuthClientRoute()
 @Controller('mcp')

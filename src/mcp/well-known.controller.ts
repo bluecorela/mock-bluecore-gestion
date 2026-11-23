@@ -1,7 +1,12 @@
 import { Controller, Get } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OAuthClientRoute, PublicRoute } from '../auth/access.decorators';
+import {
+  OAuthClientRoute,
+  PublicRoute,
+  SkipAppCheck,
+} from '../auth/access.decorators';
 
+@SkipAppCheck()
 @PublicRoute()
 @OAuthClientRoute()
 @Controller('.well-known')

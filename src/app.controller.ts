@@ -1,7 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { AppService } from './app.service';
-import { PublicRoute } from './auth/access.decorators';
+import { PublicRoute, SkipAppCheck } from './auth/access.decorators';
 
+@SkipAppCheck()
 @PublicRoute()
 @Controller()
 export class AppController {
