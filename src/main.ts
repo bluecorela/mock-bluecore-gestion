@@ -1,5 +1,6 @@
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { configureBodyParsers } from './config/body-parser';
+import { buildCorsOptions } from './config/cors';
 import { NestFactory } from '@nestjs/core';
 import { Logger, RequestMethod, ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
@@ -64,18 +65,7 @@ export function configureApplication(app: NestExpressApplication): void {
     ? configuredOrigins
     : ['http://localhost:4200', 'https://bluecore-portal-gestion-prod.web.app'];
 
-  app.enableCors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: [
-      'Content-Type',
-      'Authorization',
-      'MCP-Protocol-Version',
-      'MCP-Session-Id',
-    ],
-    exposedHeaders: ['WWW-Authenticate', 'Retry-After', 'MCP-Session-Id'],
-    credentials: true,
-  });
+  app.enableCors(buildCorsOptions(allowedOrigins));
   configureBodyParsers(app);
   app.useGlobalPipes(
     new ValidationPipe({
