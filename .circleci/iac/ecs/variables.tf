@@ -75,5 +75,10 @@ variable "app_env" {
     swagger_enabled           = string
     load_confirmation_secret  = string
     public_api_url            = string
+    mcp_enabled               = string
+    app_check_enforced        = string
+    firebase_project_id       = string
+    trust_proxy               = string
+    log_forwarded_for         = string
   })
 }

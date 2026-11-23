@@ -16,7 +16,10 @@ import { MaintenanceController } from '../maintenance/maintenance.controller';
 import {
   ANY_AUTHENTICATED_ROLE_KEY,
   PUBLIC_ROUTE_KEY,
+  SKIP_APP_CHECK_KEY,
 } from './access.decorators';
+import { McpController } from '../mcp/mcp.controller';
+import { WellKnownController } from '../mcp/well-known.controller';
 import { AuthController } from './auth.controller';
 
 type Handler = (...args: never[]) => unknown;
@@ -106,5 +109,21 @@ describe('Marcas de acceso en controllers', () => {
     expect(fn).toBeDefined();
     expect(meta(PUBLIC_ROUTE_KEY, fn)).toBeUndefined();
     expect(meta(ANY_AUTHENTICATED_ROLE_KEY, fn)).toBeUndefined();
+  });
+});
+
+describe('Exenciones de App Check', () => {
+  it.each([
+    AppController,
+    HealthController,
+    MaintenanceController,
+    McpController,
+    WellKnownController,
+  ])('%p omite App Check a nivel de clase', (controller) => {
+    expect(meta(SKIP_APP_CHECK_KEY, controller)).toBe(true);
+  });
+
+  it('AuthController requiere App Check', () => {
+    expect(meta(SKIP_APP_CHECK_KEY, AuthController)).toBeUndefined();
   });
 });

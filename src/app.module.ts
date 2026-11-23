@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConditionalModule, ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PersonnelModule } from './personnel/personnel.module';
@@ -13,6 +13,7 @@ import { PerformanceModule } from './performance/performance.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { SupabaseModule } from './supabase/supabase.module';
 import { AuthModule } from './auth/auth.module';
+import { AppCheckGuard } from './auth/app-check.guard';
 import { PortalAccessGuard } from './auth/portal-access.guard';
 import { OrganizationModule } from './organization/organization.module';
 import { WeeklyDashboardModule } from './weekly-dashboard/weekly-dashboard.module';
@@ -58,7 +59,10 @@ import { UserAdminModule } from './user-admin/user-admin.module';
     WeeklyDashboardModule,
     SprintsModule,
     HealthModule,
-    McpModule,
+    ConditionalModule.registerWhen(
+      McpModule,
+      (env) => env.MCP_ENABLED === 'true',
+    ),
     UserAdminModule,
   ],
   controllers: [AppController],
@@ -67,6 +71,10 @@ import { UserAdminModule } from './user-admin/user-admin.module';
     {
       provide: APP_GUARD,
       useClass: AppThrottlerGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: AppCheckGuard,
     },
     {
       provide: APP_GUARD,

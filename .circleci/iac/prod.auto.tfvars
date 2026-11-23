@@ -54,4 +54,9 @@ app_env = {
   swagger_enabled           = "{SWAGGER_ENABLED}"
   load_confirmation_secret  = "{LOAD_CONFIRMATION_SECRET}"
   public_api_url            = "{PUBLIC_API_URL}"
+  mcp_enabled               = "{MCP_ENABLED}"
+  app_check_enforced        = "{APP_CHECK_ENFORCED}"
+  firebase_project_id       = "{FIREBASE_PROJECT_ID}"
+  trust_proxy               = "{TRUST_PROXY}"
+  log_forwarded_for         = "{LOG_FORWARDED_FOR}"
 }

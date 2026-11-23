@@ -5,7 +5,7 @@
   "author": "",
   "private": true,
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=22 <23"
   },
   "license": "UNLICENSED",
   "scripts": {
@@ -39,6 +39,7 @@
     "@supabase/supabase-js": "^2.110.8",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
+    "firebase-admin": "^14.5.1",
     "helmet": "^8.3.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
